@@ -1,0 +1,2865 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>旅コレMAP</title>
+    <link rel="manifest" href="manifest.json">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* スマホブラウザのアアドレスバー領域を考慮した高さ設定 */
+        .app-container {
+            height: 100dvh;
+        }
+        /* 地図のパスのスタイル */
+        .pref-path {
+            stroke-width: 0.3px;
+            transition: fill 0.3s ease;
+            cursor: pointer;
+        }
+        /* スクロールバーの非表示（見た目をスッキリさせる） */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans antialiased overflow-hidden">
+    <div class="app-container flex flex-col w-full max-w-md mx-auto bg-white shadow-xl relative">
+        <!-- スプラッシュ画面 -->
+        <div id="splash-screen" class="absolute inset-0 bg-white z-[9999] flex flex-col items-center justify-center transition-opacity duration-500">
+            <div class="text-center">
+                <h1 class="text-3xl font-extrabold text-blue-600 tracking-wider mb-1">旅コレMAP</h1>
+                <p class="text-xs text-gray-500 font-medium mb-10">～Trip Collection Map～</p>
+                <div id="splash-version" class="text-xs text-gray-400 font-semibold"></div>
+            </div>
+        </div>
+
+        <!-- 上半分：日本地図エリア (固定) -->
+        <div class="relative w-full h-[45dvh] bg-sky-50 border-b border-gray-200 z-10 flex flex-col">
+            <!-- マップコンテナ -->
+            <div id="map-container" class="absolute inset-0"></div>
+            
+            <!-- ローディング表示 -->
+            <div id="loading" class="absolute inset-0 flex flex-col items-center justify-center bg-sky-50/80 backdrop-blur-sm z-20">
+                <i class="fa-solid fa-spinner fa-spin text-3xl text-blue-500 mb-2"></i>
+                <span class="text-sm text-gray-600 font-medium">地図を読み込み中...</span>
+            </div>
+
+            <!-- 設定ボタン -->
+            <button id="open-settings-btn" class="absolute top-4 right-4 z-30 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg shadow-blue-500/40 flex items-center justify-center transition-transform active:scale-95">
+                <i class="fa-solid fa-gear text-lg"></i>
+            </button>
+
+            <!-- UIオーバーレイ層 -->
+            <div class="absolute top-2 left-2 z-10 flex flex-col gap-2 pointer-events-none">
+                <!-- 制覇サマリー -->
+                <div class="bg-white/90 px-3 py-1.5 rounded-full shadow-sm text-sm font-bold border border-gray-100 text-gray-700 self-start pointer-events-auto backdrop-blur-sm flex items-center gap-1.5">
+                    制覇：<span id="visited-count" class="text-blue-600">0</span>/ 47（<span id="visited-parcent" class="text-blue-600">0</span>%）
+                </div>
+            </div>
+        </div>
+
+        <!-- 下半分：リストエリア (スクロール可能) -->
+        <div class="flex-1 overflow-y-auto px-4 pb-24 space-y-6 no-scrollbar bg-gray-50">
+            <!-- 登録済みリスト -->
+            <div>
+                <div class="sticky top-0 -mx-4 p-4 bg-gray-50 z-20 flex items-center justify-between gap-3 border-b border-gray-200/50 mb-3">
+                    <!-- 都道府県名のフィルタリング用セレクトボックス -->
+                    <div class="relative flex-1 min-w-0">
+                        <select id="pref-filter-select" class="w-full bg-white border border-gray-200 text-gray-700 rounded-xl px-3 py-2 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs font-bold shadow-sm">
+                            <option value="すべて">すべての都道府県</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- 凡例兼フィルタリング of セレクトボックス -->
+                    <div class="relative flex-1 min-w-0">
+                        <select id="type-filter-select" class="w-full bg-white border border-gray-200 text-gray-700 rounded-xl px-3 py-2 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs font-bold shadow-sm">
+                            <option value="すべて">すべての種別</option>
+                            <option value="旅行(独り)">旅行（独り）</option>
+                            <option value="旅行(友人)">旅行（友人）</option>
+                            <option value="その他">旅行（その他）</option>
+                            <option value="温泉">温泉</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="list-container" class="space-y-3">
+                    <!-- リストアイテムがJSで追加されます -->
+                    <div class="text-center py-8 text-gray-400 text-sm bg-white rounded-xl border border-gray-100 border-dashed" id="empty-state">
+                        まだ登録された県はありません。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 画面右下の＋フローティングボタン -->
+        <button id="open-form-btn" class="absolute bottom-6 right-6 z-40 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg shadow-blue-500/40 flex items-center justify-center transition-transform active:scale-95">
+            <i class="fa-solid fa-plus text-xl"></i>
+        </button>
+
+        <!-- 入力フォーム -->
+        <div id="form-dialog" class="absolute top-[45dvh] bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 flex flex-col hidden">
+            <div class="w-full h-full p-5 relative overflow-y-auto no-scrollbar">
+                <!-- 閉じるボタン -->
+                <button id="close-form-btn" class="absolute top-4 right-4 p-2 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fa-solid fa-times text-lg"></i>
+                </button>
+
+                <h2 class="text-sm font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
+                    <i class="fa-solid fa-pen-to-square mr-2 text-blue-500"></i>訪問記録の登録・更新
+                </h2>
+                
+                <form id="record-form" class="space-y-4">
+                    <!-- タイトル (新規・必須) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">タイトル <span class="text-red-500">*</span></label>
+                        <input type="text" id="title-input" required class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-sm" placeholder="旅行のタイトルなど">
+                    </div>
+
+                    <!-- 日付 (新規・任意) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">日付 (任意)</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <!-- 年 -->
+                            <div class="relative">
+                                <select id="year-select" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-3 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                                    <option value="">年</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                    <i class="fa-solid fa-chevron-down text-xs"></i>
+                                </div>
+                            </div>
+                            <!-- 月 -->
+                            <div class="relative">
+                                <select id="month-select" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-3 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                                    <option value="">月</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                    <i class="fa-solid fa-chevron-down text-xs"></i>
+                                </div>
+                            </div>
+                            <!-- 日 -->
+                            <div class="relative">
+                                <select id="day-select" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-3 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                                    <option value="">日</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                    <i class="fa-solid fa-chevron-down text-xs"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 種別 (チェックボックス形式からラジオボタン形式へ変更) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">種別 <span class="text-red-500">*</span></label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <!-- 旅行(独り) -->
+                            <label class="relative cursor-pointer">
+                                <input type="radio" name="visit-type" value="旅行(独り)" class="peer sr-only" required>
+                                <div class="text-center py-2 px-1 bg-white border-2 border-gray-200 rounded-xl font-medium text-gray-500 transition-all peer-checked:bg-blue-50 peer-checked:text-blue-600 peer-checked:border-blue-500">
+                                    <i class="fa-solid fa-user block text-lg mb-1"></i>
+                                    <span class="text-[10px]">独り</span>
+                                </div>
+                            </label>
+
+                            <!-- 旅行(友人) -->
+                            <label class="relative cursor-pointer">
+                                <input type="radio" name="visit-type" value="旅行(友人)" class="peer sr-only" required>
+                                <div class="text-center py-2 px-1 bg-white border-2 border-gray-200 rounded-xl font-medium text-gray-500 transition-all peer-checked:bg-blue-50 peer-checked:text-blue-600 peer-checked:border-blue-500 font-semibold">
+                                    <i class="fa-solid fa-user-group block text-lg mb-1"></i>
+                                    <span class="text-[10px]">友人</span>
+                                </div>
+                            </label>
+
+                            <!-- その他 -->
+                            <label class="relative cursor-pointer">
+                                <input type="radio" name="visit-type" value="その他" class="peer sr-only" required>
+                                <div class="text-center py-2 px-1 bg-white border-2 border-gray-200 rounded-xl font-medium text-gray-500 transition-all peer-checked:bg-blue-50 peer-checked:text-blue-600 peer-checked:border-blue-500">
+                                    <i class="fa-solid fa-location-dot block text-lg mb-1"></i>
+                                    <span class="text-[10px]">その他</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 県名 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">都道府県 (複数選択可) <span class="text-red-500">*</span></label>
+                        <div class="relative mb-2">
+                            <select id="pref-select" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-4 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                                <option value="" disabled selected>選択してください</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                                <i class="fa-solid fa-chevron-down text-sm"></i>
+                            </div>
+                        </div>
+                        <!-- 選択された都道府県バッジの表示エリア -->
+                        <div id="selected-prefs-container" class="flex flex-wrap gap-1.5 min-h-[24px]"></div>
+                    </div>
+
+                    <!-- 温泉 (セレクトボックス形式から複数選択へ変更) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">温泉 (複数選択可・任意)</label>
+                        <div class="relative mb-2">
+                            <select id="onsen-input" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-4 py-3 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                                <option value="" disabled selected>選択してください</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                                <i class="fa-solid fa-chevron-down text-sm"></i>
+                            </div>
+                        </div>
+                        <!-- 選択された温泉バッジの表示エリア -->
+                        <div id="selected-onsens-container" class="flex flex-wrap gap-1.5 min-h-[24px]"></div>
+                    </div>
+
+                    <!-- URL (新規・任意) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">URL (任意)</label>
+                        <input type="url" id="url-input" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-sm" placeholder="https://example.com">
+                    </div>
+
+                    <!-- 備考 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">備考 (任意)</label>
+                        <textarea id="memo-input" rows="2" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-sm" placeholder="訪れた場所や思い出など"></textarea>
+                    </div>
+
+                    <!-- ボタン -->
+                    <div class="pt-2 flex gap-2">
+                        <button type="submit" id="submit-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-blue-500/30 transition-colors flex justify-center items-center">
+                            <i class="fa-solid fa-check mr-2"></i>登録する
+                        </button>
+                        <button type="button" id="delete-btn" class="hidden bg-gray-100 hover:bg-red-50 text-red-500 font-bold py-3 px-4 rounded-xl border border-gray-200 transition-colors">
+                            <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 設定ダイアログ -->
+        <div id="settings-dialog" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 hidden">
+            <div class="bg-white rounded-2xl w-full max-w-xs p-6 shadow-2xl">
+                <!-- 設定 -->
+                <h3 class="justify-between text-lg font-bold text-gray-800 border-b border-gray-200 pb-3 flex items-center">
+                    <!-- ダイアログタイトル -->
+                    <span>
+                        <i class="fa-solid fa-gear mr-2 text-gray-500"></i>設定
+                    </span>
+
+                    <!-- 設定ボタン -->
+                    <button id="close-settings-btn" class="p-2 rounded-full text-gray-600 hover:text-blue-600 transition-colors">
+                        <i class="fa-solid fa-times text-lg"></i>
+                    </button>
+                </h3>
+
+                <!-- エクスポートボタン -->
+                <div class="rounded-2xl p-4 border border-blue-100 mt-4 mb-3">
+                    <p class="text-[11px] mb-3">
+                        登録されたデータをCSV形式で出力します。
+                    </p>
+                    <button id="export-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-ls font-bold py-2.5 rounded-lg shadow-sm">
+                        <i class="fa-solid fa-download mr-1.5"></i>データのエクスポート
+                    </button>
+                </div>
+                
+                <!-- インポートボタン -->
+                <div class="rounded-2xl p-4 border border-blue-100 mb-5">
+                    <p class="text-[11px] mb-3">
+                        CSV形式のデータをアプリに登録します。
+                    </p>
+                    <button id="inport-btn" onclick="document.getElementById('file-input').click()" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-ls font-bold py-2.5 rounded-lg shadow-sm">
+                        <i class="fa-solid fa-upload mr-1.5"></i>データのインポート
+                    </button>
+                    <input type="file" id="file-input" class="hidden" accept=".csv" onchange="importCSV(event)">
+                </div>
+
+                <!-- すべてのデータを削除 -->
+                <div class="bg-red-50/50 rounded-2xl p-4 border border-red-100 mt-10">
+                    <p class="text-[11px] text-red-700 mb-3">
+                        <i class="fa-solid fa-triangle-exclamation mr-1.5"></i>アプリに保存されているすべてのデータを削除します。
+                    </p>
+                    <button type="button" id="bulk-delete-btn" class="w-full bg-white hover:bg-red-500 hover:text-white text-red-500 text-lx font-bold py-2.5 px-4 rounded-xl border border-red-200 transition-all shadow-sm">
+                        <i class="fa-solid fa-trash-can mr-1.5"></i>すべてのデータを削除
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- カスタムダイアログ (Alert/Confirm代替) -->
+        <div id="custom-dialog" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 hidden">
+            <div class="bg-white rounded-2xl w-full max-w-xs p-6 shadow-2xl flex flex-col">
+                <h3 id="custom-dialog-title" class="text-base font-bold text-gray-800 mb-2">確認</h3>
+                <p id="custom-dialog-message" class="text-xs text-gray-600 mb-6 whitespace-pre-wrap">メッセージ</p>
+                <div class="flex gap-2 justify-end">
+                    <button id="custom-dialog-cancel" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 px-4 rounded-xl text-xs transition-colors">
+                        キャンセル
+                    </button>
+                    <button id="custom-dialog-ok" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-colors">
+                        OK
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- トースト通知 -->
+        <div id="toast" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50 whitespace-nowrap">
+            保存しました
+        </div>
+    </div>
+
+    <script>
+        // アプリバージョン情報
+        const APP_VERSION = "ver1.0";
+
+        // 温泉データ（onsen.jsonの内容）
+        const ONSEN_DATA = [
+          { "prefecture": "北海道", "spa": "湯の川温泉" },
+          { "prefecture": "北海道", "spa": "洞爺湖温泉" },
+          { "prefecture": "北海道", "spa": "層雲峡温泉" },
+          { "prefecture": "北海道", "spa": "虎杖浜温泉" },
+          { "prefecture": "北海道", "spa": "ウトロ温泉" },
+          { "prefecture": "北海道", "spa": "阿寒湖温泉" },
+          { "prefecture": "北海道", "spa": "十勝川温泉" },
+          { "prefecture": "北海道", "spa": "川湯温泉" },
+          { "prefecture": "北海道", "spa": "旭岳温泉" },
+          { "prefecture": "北海道", "spa": "支笏湖温泉" },
+          { "prefecture": "北海道", "spa": "朝里川温泉" },
+          { "prefecture": "北海道", "spa": "ニセコ湯本温泉" },
+          { "prefecture": "北海道", "spa": "北湯沢温泉" },
+          { "prefecture": "北海道", "spa": "鹿部温泉" },
+          { "prefecture": "北海道", "spa": "白金温泉" },
+          { "prefecture": "北海道", "spa": "羅臼温泉" },
+          { "prefecture": "北海道", "spa": "定山渓温泉" },
+          { "prefecture": "北海道", "spa": "ニセコ昆布温泉" },
+          { "prefecture": "北海道", "spa": "いわない温泉郷" },
+          { "prefecture": "北海道", "spa": "カルルス温泉" },
+          { "prefecture": "北海道", "spa": "蟠渓温泉" },
+          { "prefecture": "北海道", "spa": "雌阿寒温泉" },
+          { "prefecture": "北海道", "spa": "糠平温泉" },
+          { "prefecture": "北海道", "spa": "豊富温泉" },
+          { "prefecture": "北海道", "spa": "養老牛温泉" },
+          { "prefecture": "北海道", "spa": "仁伏温泉" },
+          { "prefecture": "北海道", "spa": "新登別温泉" },
+          { "prefecture": "北海道", "spa": "恵山温泉郷" },
+          { "prefecture": "北海道", "spa": "濁川温泉郷" },
+          { "prefecture": "北海道", "spa": "十勝岳温泉" },
+          { "prefecture": "北海道", "spa": "天人峡温泉" },
+          { "prefecture": "北海道", "spa": "然別湖畔温泉" },
+          { "prefecture": "北海道", "spa": "網走湖畔温泉" },
+          { "prefecture": "北海道", "spa": "温根湯温泉" },
+          { "prefecture": "北海道", "spa": "尾岱沼温泉" },
+          { "prefecture": "北海道", "spa": "小金湯温泉" },
+          { "prefecture": "北海道", "spa": "ニセコ五色温泉" },
+          { "prefecture": "北海道", "spa": "ニセコ新見温泉" },
+          { "prefecture": "北海道", "spa": "ニセコアンヌプリ温泉" },
+          { "prefecture": "北海道", "spa": "ニセコ東山温泉" },
+          { "prefecture": "北海道", "spa": "ニセコワイス高原温泉" },
+          { "prefecture": "北海道", "spa": "雷電温泉郷" },
+          { "prefecture": "北海道", "spa": "平田内温泉" },
+          { "prefecture": "北海道", "spa": "長万部温泉" },
+          { "prefecture": "北海道", "spa": "西大沼温泉" },
+          { "prefecture": "北海道", "spa": "吹上温泉" },
+          { "prefecture": "北海道", "spa": "幕別温泉" },
+          { "prefecture": "北海道", "spa": "幌加温泉" },
+          { "prefecture": "北海道", "spa": "岩尾別温泉" },
+          { "prefecture": "北海道", "spa": "小清水温泉" },
+          { "prefecture": "北海道", "spa": "丸瀬布温泉" },
+          { "prefecture": "北海道", "spa": "はまとんべつ温泉" },
+          { "prefecture": "北海道", "spa": "和琴温泉" },
+          { "prefecture": "北海道", "spa": "竹山高原温泉" },
+          { "prefecture": "北海道", "spa": "太美温泉" },
+          { "prefecture": "北海道", "spa": "中小屋温泉" },
+          { "prefecture": "北海道", "spa": "ニセコ薬師温泉" },
+          { "prefecture": "北海道", "spa": "昆布川温泉" },
+          { "prefecture": "北海道", "spa": "ひらふ温泉郷" },
+          { "prefecture": "北海道", "spa": "茂津多海岸温泉" },
+          { "prefecture": "北海道", "spa": "朝日温泉" },
+          { "prefecture": "北海道", "spa": "宮内温泉" },
+          { "prefecture": "北海道", "spa": "丸駒温泉" },
+          { "prefecture": "北海道", "spa": "いとう温泉" },
+          { "prefecture": "北海道", "spa": "七重浜温泉" },
+          { "prefecture": "北海道", "spa": "上の湯温泉" },
+          { "prefecture": "北海道", "spa": "二股らぢうむ温泉" },
+          { "prefecture": "北海道", "spa": "八雲温泉" },
+          { "prefecture": "北海道", "spa": "奥美利河温泉" },
+          { "prefecture": "北海道", "spa": "見市温泉" },
+          { "prefecture": "北海道", "spa": "東大沼温泉" },
+          { "prefecture": "北海道", "spa": "桜野温泉" },
+          { "prefecture": "北海道", "spa": "北檜山温泉" },
+          { "prefecture": "北海道", "spa": "美利河温泉" },
+          { "prefecture": "北海道", "spa": "ねとも温泉" },
+          { "prefecture": "北海道", "spa": "知内温泉" },
+          { "prefecture": "北海道", "spa": "乙部温泉郷" },
+          { "prefecture": "北海道", "spa": "東神楽温泉" },
+          { "prefecture": "北海道", "spa": "大雪高原温泉" },
+          { "prefecture": "北海道", "spa": "秩父別温泉" },
+          { "prefecture": "北海道", "spa": "五味温泉" },
+          { "prefecture": "北海道", "spa": "愛山渓温泉" },
+          { "prefecture": "北海道", "spa": "びふか温泉" },
+          { "prefecture": "北海道", "spa": "北竜温泉" },
+          { "prefecture": "北海道", "spa": "芦別温泉" },
+          { "prefecture": "北海道", "spa": "島の下温泉" },
+          { "prefecture": "北海道", "spa": "ながぬま温泉" },
+          { "prefecture": "北海道", "spa": "北村温泉" },
+          { "prefecture": "北海道", "spa": "馬追温泉" },
+          { "prefecture": "北海道", "spa": "芽登温泉" },
+          { "prefecture": "北海道", "spa": "トムラウシ温泉" },
+          { "prefecture": "北海道", "spa": "オソウシ温泉" },
+          { "prefecture": "北海道", "spa": "山田温泉" },
+          { "prefecture": "北海道", "spa": "くったり温泉" },
+          { "prefecture": "北海道", "spa": "筒井温泉" },
+          { "prefecture": "北海道", "spa": "本別温泉" },
+          { "prefecture": "北海道", "spa": "沙流川温泉" },
+          { "prefecture": "北海道", "spa": "塩別温泉" },
+          { "prefecture": "北海道", "spa": "鹿の子温泉" },
+          { "prefecture": "北海道", "spa": "てしお温泉" },
+          { "prefecture": "北海道", "spa": "旭温泉" },
+          { "prefecture": "北海道", "spa": "ピンネシリ温泉" },
+          { "prefecture": "北海道", "spa": "とままえ温泉" },
+          { "prefecture": "北海道", "spa": "はぼろ温泉" },
+          { "prefecture": "北海道", "spa": "その他" },
+          { "prefecture": "青森県", "spa": "大鰐温泉" },
+          { "prefecture": "青森県", "spa": "下風呂温泉" },
+          { "prefecture": "青森県", "spa": "浅虫温泉" },
+          { "prefecture": "青森県", "spa": "奥入瀬渓流温泉" },
+          { "prefecture": "青森県", "spa": "嶽温泉" },
+          { "prefecture": "青森県", "spa": "百沢温泉" },
+          { "prefecture": "青森県", "spa": "十和田湖畔温泉" },
+          { "prefecture": "青森県", "spa": "碇ヶ関温泉郷" },
+          { "prefecture": "青森県", "spa": "湯段温泉" },
+          { "prefecture": "青森県", "spa": "温湯温泉" },
+          { "prefecture": "青森県", "spa": "落合温泉" },
+          { "prefecture": "青森県", "spa": "板留温泉" },
+          { "prefecture": "青森県", "spa": "薬研温泉" },
+          { "prefecture": "青森県", "spa": "古牧温泉" },
+          { "prefecture": "青森県", "spa": "稲垣温泉" },
+          { "prefecture": "青森県", "spa": "みちのく温泉" },
+          { "prefecture": "青森県", "spa": "酸ヶ湯温泉" },
+          { "prefecture": "青森県", "spa": "八甲田温泉" },
+          { "prefecture": "青森県", "spa": "寒水沢温泉" },
+          { "prefecture": "青森県", "spa": "古遠部温泉" },
+          { "prefecture": "青森県", "spa": "南田温泉" },
+          { "prefecture": "青森県", "spa": "三本柳温泉" },
+          { "prefecture": "青森県", "spa": "御所温泉" },
+          { "prefecture": "青森県", "spa": "大坊温泉" },
+          { "prefecture": "青森県", "spa": "青荷温泉" },
+          { "prefecture": "青森県", "spa": "温川温泉" },
+          { "prefecture": "青森県", "spa": "五戸まきば温泉" },
+          { "prefecture": "青森県", "spa": "蔦温泉" },
+          { "prefecture": "青森県", "spa": "谷地温泉" },
+          { "prefecture": "青森県", "spa": "猿倉温泉" },
+          { "prefecture": "青森県", "spa": "鷲ノ湯温泉" },
+          { "prefecture": "青森県", "spa": "馬門温泉" },
+          { "prefecture": "青森県", "spa": "大間温泉" },
+          { "prefecture": "青森県", "spa": "黄金崎不老不死温泉" },
+          { "prefecture": "青森県", "spa": "その他" },
+          { "prefecture": "岩手県", "spa": "鶯宿温泉" },
+          { "prefecture": "岩手県", "spa": "繋温泉" },
+          { "prefecture": "岩手県", "spa": "台温泉" },
+          { "prefecture": "岩手県", "spa": "八幡平温泉郷" },
+          { "prefecture": "岩手県", "spa": "湯川温泉" },
+          { "prefecture": "岩手県", "spa": "金田一温泉" },
+          { "prefecture": "岩手県", "spa": "巣郷温泉" },
+          { "prefecture": "岩手県", "spa": "国見温泉" },
+          { "prefecture": "岩手県", "spa": "網張温泉" },
+          { "prefecture": "岩手県", "spa": "夏油温泉" },
+          { "prefecture": "岩手県", "spa": "松川温泉" },
+          { "prefecture": "岩手県", "spa": "矢巾温泉" },
+          { "prefecture": "岩手県", "spa": "玄武温泉" },
+          { "prefecture": "岩手県", "spa": "大沢温泉" },
+          { "prefecture": "岩手県", "spa": "鉛温泉" },
+          { "prefecture": "岩手県", "spa": "志戸平温泉" },
+          { "prefecture": "岩手県", "spa": "岩手湯本温泉" },
+          { "prefecture": "岩手県", "spa": "厳美渓温泉" },
+          { "prefecture": "岩手県", "spa": "奥中山高原温泉" },
+          { "prefecture": "岩手県", "spa": "南網張ありね温泉" },
+          { "prefecture": "岩手県", "spa": "雫石高倉温泉" },
+          { "prefecture": "岩手県", "spa": "ぬくもり温泉" },
+          { "prefecture": "岩手県", "spa": "新鉛温泉" },
+          { "prefecture": "岩手県", "spa": "渡り温泉" },
+          { "prefecture": "岩手県", "spa": "松倉温泉" },
+          { "prefecture": "岩手県", "spa": "瀬美温泉" },
+          { "prefecture": "岩手県", "spa": "水神温泉" },
+          { "prefecture": "岩手県", "spa": "金ヶ崎温泉" },
+          { "prefecture": "岩手県", "spa": "入畑温泉" },
+          { "prefecture": "岩手県", "spa": "志賀来温泉" },
+          { "prefecture": "岩手県", "spa": "焼石岳温泉" },
+          { "prefecture": "岩手県", "spa": "宝竜温泉" },
+          { "prefecture": "岩手県", "spa": "藤七温泉" },
+          { "prefecture": "岩手県", "spa": "新安比温泉" },
+          { "prefecture": "岩手県", "spa": "新山根温泉" },
+          { "prefecture": "岩手県", "spa": "その他" },
+          { "prefecture": "秋田県", "spa": "田沢湖高原温泉郷" },
+          { "prefecture": "秋田県", "spa": "男鹿温泉" },
+          { "prefecture": "秋田県", "spa": "小安峡温泉" },
+          { "prefecture": "秋田県", "spa": "秋の宮温泉郷" },
+          { "prefecture": "秋田県", "spa": "乳頭温泉郷" },
+          { "prefecture": "秋田県", "spa": "水沢温泉郷" },
+          { "prefecture": "秋田県", "spa": "玉川温泉" },
+          { "prefecture": "秋田県", "spa": "湯瀬温泉" },
+          { "prefecture": "秋田県", "spa": "秋田温泉" },
+          { "prefecture": "秋田県", "spa": "強首温泉" },
+          { "prefecture": "秋田県", "spa": "大葛温泉" },
+          { "prefecture": "秋田県", "spa": "大滝温泉" },
+          { "prefecture": "秋田県", "spa": "泥湯温泉" },
+          { "prefecture": "秋田県", "spa": "横手駅前温泉" },
+          { "prefecture": "秋田県", "spa": "上畑温泉" },
+          { "prefecture": "秋田県", "spa": "矢立温泉" },
+          { "prefecture": "秋田県", "spa": "猿倉温泉" },
+          { "prefecture": "秋田県", "spa": "三内峡温泉" },
+          { "prefecture": "秋田県", "spa": "仁別温泉" },
+          { "prefecture": "秋田県", "spa": "松木田温泉" },
+          { "prefecture": "秋田県", "spa": "かみおか温泉" },
+          { "prefecture": "秋田県", "spa": "西仙北ぬく森温泉" },
+          { "prefecture": "秋田県", "spa": "新玉川温泉" },
+          { "prefecture": "秋田県", "spa": "西木温泉" },
+          { "prefecture": "秋田県", "spa": "後生掛温泉" },
+          { "prefecture": "秋田県", "spa": "蒸ノ湯温泉" },
+          { "prefecture": "秋田県", "spa": "大沼温泉" },
+          { "prefecture": "秋田県", "spa": "大湯温泉" },
+          { "prefecture": "秋田県", "spa": "打当温泉" },
+          { "prefecture": "秋田県", "spa": "湯の沢温泉" },
+          { "prefecture": "秋田県", "spa": "日景温泉" },
+          { "prefecture": "秋田県", "spa": "滝温泉" },
+          { "prefecture": "秋田県", "spa": "安楽温泉" },
+          { "prefecture": "秋田県", "spa": "その他" },
+          { "prefecture": "宮城県", "spa": "遠刈田温泉" },
+          { "prefecture": "宮城県", "spa": "中山平温泉" },
+          { "prefecture": "宮城県", "spa": "青根温泉" },
+          { "prefecture": "宮城県", "spa": "東鳴子温泉" },
+          { "prefecture": "宮城県", "spa": "川渡温泉" },
+          { "prefecture": "宮城県", "spa": "鬼首温泉" },
+          { "prefecture": "宮城県", "spa": "小原温泉" },
+          { "prefecture": "宮城県", "spa": "鎌先温泉" },
+          { "prefecture": "宮城県", "spa": "くりこま高原温泉郷" },
+          { "prefecture": "宮城県", "spa": "吹上温泉" },
+          { "prefecture": "宮城県", "spa": "泉ヶ岳温泉" },
+          { "prefecture": "宮城県", "spa": "七郷温泉" },
+          { "prefecture": "宮城県", "spa": "峩々温泉" },
+          { "prefecture": "宮城県", "spa": "金山温泉" },
+          { "prefecture": "宮城県", "spa": "温湯温泉" },
+          { "prefecture": "宮城県", "spa": "花山温泉" },
+          { "prefecture": "宮城県", "spa": "湯浜温泉" },
+          { "prefecture": "宮城県", "spa": "その他" },
+          { "prefecture": "山形県", "spa": "肘折温泉" },
+          { "prefecture": "山形県", "spa": "小野川温泉" },
+          { "prefecture": "山形県", "spa": "湯野浜温泉" },
+          { "prefecture": "山形県", "spa": "銀山温泉" },
+          { "prefecture": "山形県", "spa": "東根温泉" },
+          { "prefecture": "山形県", "spa": "赤倉温泉" },
+          { "prefecture": "山形県", "spa": "あつみ温泉" },
+          { "prefecture": "山形県", "spa": "湯田川温泉" },
+          { "prefecture": "山形県", "spa": "瀬見温泉" },
+          { "prefecture": "山形県", "spa": "月山志津温泉" },
+          { "prefecture": "山形県", "spa": "羽根沢温泉" },
+          { "prefecture": "山形県", "spa": "飯豊温泉" },
+          { "prefecture": "山形県", "spa": "鳥海温泉" },
+          { "prefecture": "山形県", "spa": "黒沢温泉" },
+          { "prefecture": "山形県", "spa": "大石田温泉" },
+          { "prefecture": "山形県", "spa": "碁点温泉" },
+          { "prefecture": "山形県", "spa": "湯舟沢温泉" },
+          { "prefecture": "山形県", "spa": "鶴子温泉" },
+          { "prefecture": "山形県", "spa": "泡の湯温泉" },
+          { "prefecture": "山形県", "spa": "鷹野湯温泉" },
+          { "prefecture": "山形県", "spa": "いいで添川温泉" },
+          { "prefecture": "山形県", "spa": "滑川温泉" },
+          { "prefecture": "山形県", "spa": "姥湯温泉" },
+          { "prefecture": "山形県", "spa": "五色温泉" },
+          { "prefecture": "山形県", "spa": "新高湯温泉" },
+          { "prefecture": "山形県", "spa": "大平温泉" },
+          { "prefecture": "山形県", "spa": "湯の沢温泉" },
+          { "prefecture": "山形県", "spa": "笠松温泉" },
+          { "prefecture": "山形県", "spa": "まむろ川温泉" },
+          { "prefecture": "山形県", "spa": "草薙温泉" },
+          { "prefecture": "山形県", "spa": "なの花温泉" },
+          { "prefecture": "山形県", "spa": "由良温泉" },
+          { "prefecture": "山形県", "spa": "湯の台温泉" },
+          { "prefecture": "山形県", "spa": "飯森山温泉" },
+          { "prefecture": "山形県", "spa": "飯田温泉" },
+          { "prefecture": "山形県", "spa": "その他" },
+          { "prefecture": "福島県", "spa": "飯坂温泉" },
+          { "prefecture": "福島県", "spa": "磐梯熱海温泉" },
+          { "prefecture": "福島県", "spa": "いわき湯本温泉" },
+          { "prefecture": "福島県", "spa": "湯野上温泉" },
+          { "prefecture": "福島県", "spa": "土湯温泉" },
+          { "prefecture": "福島県", "spa": "東山温泉" },
+          { "prefecture": "福島県", "spa": "岳温泉" },
+          { "prefecture": "福島県", "spa": "芦ノ牧温泉" },
+          { "prefecture": "福島県", "spa": "中ノ沢温泉" },
+          { "prefecture": "福島県", "spa": "尾瀬檜枝岐温泉" },
+          { "prefecture": "福島県", "spa": "高湯温泉" },
+          { "prefecture": "福島県", "spa": "湯ノ花温泉" },
+          { "prefecture": "福島県", "spa": "二岐温泉" },
+          { "prefecture": "福島県", "spa": "穴原温泉" },
+          { "prefecture": "福島県", "spa": "西山温泉" },
+          { "prefecture": "福島県", "spa": "新甲子温泉" },
+          { "prefecture": "福島県", "spa": "母畑温泉" },
+          { "prefecture": "福島県", "spa": "横向温泉" },
+          { "prefecture": "福島県", "spa": "玉梨・八町温泉" },
+          { "prefecture": "福島県", "spa": "木賊温泉" },
+          { "prefecture": "福島県", "spa": "沼尻温泉" },
+          { "prefecture": "福島県", "spa": "押立温泉" },
+          { "prefecture": "福島県", "spa": "熱塩温泉" },
+          { "prefecture": "福島県", "spa": "宮下温泉" },
+          { "prefecture": "福島県", "spa": "柳津温泉" },
+          { "prefecture": "福島県", "spa": "湯岐温泉" },
+          { "prefecture": "福島県", "spa": "玉山温泉" },
+          { "prefecture": "福島県", "spa": "幕川温泉" },
+          { "prefecture": "福島県", "spa": "大塩裏磐梯温泉" },
+          { "prefecture": "福島県", "spa": "新鶴温泉" },
+          { "prefecture": "福島県", "spa": "大塩温泉" },
+          { "prefecture": "福島県", "spa": "深沢温泉" },
+          { "prefecture": "福島県", "spa": "小豆温泉" },
+          { "prefecture": "福島県", "spa": "岩瀬湯本温泉" },
+          { "prefecture": "福島県", "spa": "新野地温泉" },
+          { "prefecture": "福島県", "spa": "野地温泉" },
+          { "prefecture": "福島県", "spa": "鷲倉温泉" },
+          { "prefecture": "福島県", "spa": "不動湯温泉" },
+          { "prefecture": "福島県", "spa": "微温湯温泉" },
+          { "prefecture": "福島県", "spa": "奥土湯川上温泉" },
+          { "prefecture": "福島県", "spa": "こおり温泉" },
+          { "prefecture": "福島県", "spa": "塩沢温泉" },
+          { "prefecture": "福島県", "spa": "藤沼温泉" },
+          { "prefecture": "福島県", "spa": "針湯温泉" },
+          { "prefecture": "福島県", "spa": "猫魔温泉" },
+          { "prefecture": "福島県", "spa": "日中温泉" },
+          { "prefecture": "福島県", "spa": "昭和温泉" },
+          { "prefecture": "福島県", "spa": "会津高原温泉" },
+          { "prefecture": "福島県", "spa": "甲子温泉" },
+          { "prefecture": "福島県", "spa": "東舘温泉" },
+          { "prefecture": "福島県", "spa": "天神岬温泉" },
+          { "prefecture": "福島県", "spa": "神白温泉" },
+          { "prefecture": "福島県", "spa": "久の浜温泉" },
+          { "prefecture": "福島県", "spa": "新舞子温泉" },
+          { "prefecture": "福島県", "spa": "いわき三崎温泉" },
+          { "prefecture": "福島県", "spa": "その他" },
+          { "prefecture": "茨城県", "spa": "大子温泉" },
+          { "prefecture": "茨城県", "spa": "平潟港温泉" },
+          { "prefecture": "茨城県", "spa": "五浦温泉" },
+          { "prefecture": "茨城県", "spa": "袋田温泉" },
+          { "prefecture": "茨城県", "spa": "磯原温泉" },
+          { "prefecture": "茨城県", "spa": "潮来水原温泉" },
+          { "prefecture": "茨城県", "spa": "鵜の岬温泉" },
+          { "prefecture": "茨城県", "spa": "横川温泉" },
+          { "prefecture": "茨城県", "spa": "月居温泉" },
+          { "prefecture": "茨城県", "spa": "浅川温泉" },
+          { "prefecture": "茨城県", "spa": "湯の網温泉" },
+          { "prefecture": "茨城県", "spa": "その他" },
+          { "prefecture": "栃木県", "spa": "那須湯本温泉" },
+          { "prefecture": "栃木県", "spa": "日光湯元温泉" },
+          { "prefecture": "栃木県", "spa": "新那須温泉" },
+          { "prefecture": "栃木県", "spa": "古町温泉" },
+          { "prefecture": "栃木県", "spa": "川治温泉" },
+          { "prefecture": "栃木県", "spa": "喜連川温泉" },
+          { "prefecture": "栃木県", "spa": "福渡温泉" },
+          { "prefecture": "栃木県", "spa": "板室温泉" },
+          { "prefecture": "栃木県", "spa": "中塩原温泉" },
+          { "prefecture": "栃木県", "spa": "奥塩原新湯温泉" },
+          { "prefecture": "栃木県", "spa": "塩釜温泉" },
+          { "prefecture": "栃木県", "spa": "中禅寺温泉" },
+          { "prefecture": "栃木県", "spa": "門前温泉" },
+          { "prefecture": "栃木県", "spa": "上塩原温泉" },
+          { "prefecture": "栃木県", "spa": "川俣温泉" },
+          { "prefecture": "栃木県", "spa": "畑下温泉" },
+          { "prefecture": "栃木県", "spa": "元湯温泉" },
+          { "prefecture": "栃木県", "spa": "小来川温泉" },
+          { "prefecture": "栃木県", "spa": "八幡温泉" },
+          { "prefecture": "栃木県", "spa": "塩の湯温泉" },
+          { "prefecture": "栃木県", "spa": "大田原温泉" },
+          { "prefecture": "栃木県", "spa": "三斗小屋温泉" },
+          { "prefecture": "栃木県", "spa": "足尾温泉" },
+          { "prefecture": "栃木県", "spa": "平家平温泉" },
+          { "prefecture": "栃木県", "spa": "北温泉" },
+          { "prefecture": "栃木県", "spa": "弁天温泉" },
+          { "prefecture": "栃木県", "spa": "高雄温泉" },
+          { "prefecture": "栃木県", "spa": "与一温泉" },
+          { "prefecture": "栃木県", "spa": "大網温泉" },
+          { "prefecture": "栃木県", "spa": "小滝鉱泉" },
+          { "prefecture": "栃木県", "spa": "湯津上温泉" },
+          { "prefecture": "栃木県", "spa": "加仁湯温泉" },
+          { "prefecture": "栃木県", "spa": "女夫渕温泉" },
+          { "prefecture": "栃木県", "spa": "光徳温泉" },
+          { "prefecture": "栃木県", "spa": "手白澤温泉" },
+          { "prefecture": "栃木県", "spa": "かご岩温泉" },
+          { "prefecture": "栃木県", "spa": "日光沢温泉" },
+          { "prefecture": "栃木県", "spa": "霧降高原温泉" },
+          { "prefecture": "栃木県", "spa": "その他" },
+          { "prefecture": "群馬県", "spa": "草津温泉" },
+          { "prefecture": "群馬県", "spa": "猿ヶ京温泉" },
+          { "prefecture": "群馬県", "spa": "片品温泉" },
+          { "prefecture": "群馬県", "spa": "老神温泉" },
+          { "prefecture": "群馬県", "spa": "尾瀬戸倉温泉" },
+          { "prefecture": "群馬県", "spa": "沢渡温泉" },
+          { "prefecture": "群馬県", "spa": "湯宿温泉" },
+          { "prefecture": "群馬県", "spa": "湯ノ小屋温泉" },
+          { "prefecture": "群馬県", "spa": "尻焼温泉" },
+          { "prefecture": "群馬県", "spa": "上牧温泉" },
+          { "prefecture": "群馬県", "spa": "湯桧曽温泉" },
+          { "prefecture": "群馬県", "spa": "川場温泉" },
+          { "prefecture": "群馬県", "spa": "八塩温泉" },
+          { "prefecture": "群馬県", "spa": "新鹿沢温泉" },
+          { "prefecture": "群馬県", "spa": "鎌田温泉" },
+          { "prefecture": "群馬県", "spa": "霧積温泉" },
+          { "prefecture": "群馬県", "spa": "応徳温泉" },
+          { "prefecture": "群馬県", "spa": "嬬恋温泉" },
+          { "prefecture": "群馬県", "spa": "白根温泉" },
+          { "prefecture": "群馬県", "spa": "武尊温泉" },
+          { "prefecture": "群馬県", "spa": "塩河原温泉" },
+          { "prefecture": "群馬県", "spa": "榛名湖温泉" },
+          { "prefecture": "群馬県", "spa": "薬師温泉" },
+          { "prefecture": "群馬県", "spa": "湯の平温泉" },
+          { "prefecture": "群馬県", "spa": "川中温泉" },
+          { "prefecture": "群馬県", "spa": "温川温泉" },
+          { "prefecture": "群馬県", "spa": "鳩ノ湯温泉" },
+          { "prefecture": "群馬県", "spa": "半出来温泉" },
+          { "prefecture": "群馬県", "spa": "鹿沢温泉" },
+          { "prefecture": "群馬県", "spa": "法師温泉" },
+          { "prefecture": "群馬県", "spa": "川古温泉" },
+          { "prefecture": "群馬県", "spa": "真沢温泉" },
+          { "prefecture": "群馬県", "spa": "うの瀬温泉" },
+          { "prefecture": "群馬県", "spa": "丸沼温泉" },
+          { "prefecture": "群馬県", "spa": "桜川温泉" },
+          { "prefecture": "群馬県", "spa": "梨木温泉" },
+          { "prefecture": "群馬県", "spa": "やぶ塚温泉" },
+          { "prefecture": "群馬県", "spa": "相間川温泉" },
+          { "prefecture": "群馬県", "spa": "滝沢温泉" },
+          { "prefecture": "群馬県", "spa": "その他" },
+          { "prefecture": "千葉県", "spa": "白子温泉" },
+          { "prefecture": "千葉県", "spa": "養老渓谷温泉郷" },
+          { "prefecture": "千葉県", "spa": "亀山温泉" },
+          { "prefecture": "千葉県", "spa": "飯岡温泉" },
+          { "prefecture": "千葉県", "spa": "三日月温泉" },
+          { "prefecture": "千葉県", "spa": "青堀温泉" },
+          { "prefecture": "千葉県", "spa": "岩婦温泉" },
+          { "prefecture": "千葉県", "spa": "鋸山金谷温泉" },
+          { "prefecture": "千葉県", "spa": "旭九十九里温泉" },
+          { "prefecture": "千葉県", "spa": "曽呂温泉" },
+          { "prefecture": "千葉県", "spa": "粟斗温泉" },
+          { "prefecture": "千葉県", "spa": "鵜原温泉" },
+          { "prefecture": "千葉県", "spa": "その他" },
+          { "prefecture": "埼玉県", "spa": "黒山鉱泉" },
+          { "prefecture": "埼玉県", "spa": "大滝温泉" },
+          { "prefecture": "埼玉県", "spa": "名栗温泉" },
+          { "prefecture": "埼玉県", "spa": "金山温泉" },
+          { "prefecture": "埼玉県", "spa": "新木鉱泉" },
+          { "prefecture": "埼玉県", "spa": "白久温泉" },
+          { "prefecture": "埼玉県", "spa": "和銅鉱泉" },
+          { "prefecture": "埼玉県", "spa": "丸山鉱泉" },
+          { "prefecture": "埼玉県", "spa": "柴原鉱泉" },
+          { "prefecture": "埼玉県", "spa": "その他" },
+          { "prefecture": "東京都", "spa": "大島温泉" },
+          { "prefecture": "東京都", "spa": "岩蔵温泉" },
+          { "prefecture": "東京都", "spa": "鴎外温泉" },
+          { "prefecture": "東京都", "spa": "蛇の湯温泉" },
+          { "prefecture": "東京都", "spa": "松乃温泉" },
+          { "prefecture": "東京都", "spa": "間々下温泉" },
+          { "prefecture": "東京都", "spa": "その他" },
+          { "prefecture": "神奈川県", "spa": "強羅温泉" },
+          { "prefecture": "神奈川県", "spa": "仙石原温泉" },
+          { "prefecture": "神奈川県", "spa": "箱根湯本温泉" },
+          { "prefecture": "神奈川県", "spa": "大平台温泉" },
+          { "prefecture": "神奈川県", "spa": "芦ノ湖温泉" },
+          { "prefecture": "神奈川県", "spa": "小涌谷温泉" },
+          { "prefecture": "神奈川県", "spa": "伊勢原温泉" },
+          { "prefecture": "神奈川県", "spa": "宮ノ下温泉" },
+          { "prefecture": "神奈川県", "spa": "塔ノ沢温泉" },
+          { "prefecture": "神奈川県", "spa": "姥子温泉" },
+          { "prefecture": "神奈川県", "spa": "中川温泉" },
+          { "prefecture": "神奈川県", "spa": "元箱根温泉" },
+          { "prefecture": "神奈川県", "spa": "七沢温泉" },
+          { "prefecture": "神奈川県", "spa": "奥湯河原温泉" },
+          { "prefecture": "神奈川県", "spa": "木賀温泉" },
+          { "prefecture": "神奈川県", "spa": "鶴巻温泉" },
+          { "prefecture": "神奈川県", "spa": "底倉温泉" },
+          { "prefecture": "神奈川県", "spa": "蛸川温泉" },
+          { "prefecture": "神奈川県", "spa": "飯山温泉" },
+          { "prefecture": "神奈川県", "spa": "芦之湯温泉" },
+          { "prefecture": "神奈川県", "spa": "かぶと湯温泉" },
+          { "prefecture": "神奈川県", "spa": "湯ノ花沢温泉" },
+          { "prefecture": "神奈川県", "spa": "二ノ平温泉" },
+          { "prefecture": "神奈川県", "spa": "箱根堂ヶ島温泉" },
+          { "prefecture": "神奈川県", "spa": "その他" },
+          { "prefecture": "新潟県", "spa": "赤倉温泉" },
+          { "prefecture": "新潟県", "spa": "妙高温泉" },
+          { "prefecture": "新潟県", "spa": "月岡温泉" },
+          { "prefecture": "新潟県", "spa": "松之山温泉" },
+          { "prefecture": "新潟県", "spa": "池の平温泉" },
+          { "prefecture": "新潟県", "spa": "岩室温泉" },
+          { "prefecture": "新潟県", "spa": "咲花温泉" },
+          { "prefecture": "新潟県", "spa": "燕温泉" },
+          { "prefecture": "新潟県", "spa": "鵜の浜温泉" },
+          { "prefecture": "新潟県", "spa": "村杉温泉" },
+          { "prefecture": "新潟県", "spa": "高瀬温泉" },
+          { "prefecture": "新潟県", "spa": "関温泉" },
+          { "prefecture": "新潟県", "spa": "出湯温泉" },
+          { "prefecture": "新潟県", "spa": "大湯温泉" },
+          { "prefecture": "新潟県", "spa": "三川温泉" },
+          { "prefecture": "新潟県", "spa": "雲母温泉" },
+          { "prefecture": "新潟県", "spa": "赤湯温泉" },
+          { "prefecture": "新潟県", "spa": "蓬平温泉" },
+          { "prefecture": "新潟県", "spa": "湯田上温泉" },
+          { "prefecture": "新潟県", "spa": "新赤倉温泉" },
+          { "prefecture": "新潟県", "spa": "御神楽温泉" },
+          { "prefecture": "新潟県", "spa": "栃尾又温泉" },
+          { "prefecture": "新潟県", "spa": "折立温泉" },
+          { "prefecture": "新潟県", "spa": "津南駅前温泉" },
+          { "prefecture": "新潟県", "spa": "椎崎温泉" },
+          { "prefecture": "新潟県", "spa": "かのせ温泉" },
+          { "prefecture": "新潟県", "spa": "貝掛温泉" },
+          { "prefecture": "新潟県", "spa": "大沢温泉" },
+          { "prefecture": "新潟県", "spa": "守門温泉" },
+          { "prefecture": "新潟県", "spa": "清津峡温泉" },
+          { "prefecture": "新潟県", "spa": "結東温泉" },
+          { "prefecture": "新潟県", "spa": "翡翠温泉郷" },
+          { "prefecture": "新潟県", "spa": "柵口温泉" },
+          { "prefecture": "新潟県", "spa": "柿崎上下浜温泉" },
+          { "prefecture": "新潟県", "spa": "今板温泉" },
+          { "prefecture": "新潟県", "spa": "新三川温泉" },
+          { "prefecture": "新潟県", "spa": "馬下温泉" },
+          { "prefecture": "新潟県", "spa": "麒麟山温泉" },
+          { "prefecture": "新潟県", "spa": "青葉温泉" },
+          { "prefecture": "新潟県", "spa": "駒の湯温泉" },
+          { "prefecture": "新潟県", "spa": "神湯温泉" },
+          { "prefecture": "新潟県", "spa": "寿和温泉" },
+          { "prefecture": "新潟県", "spa": "中子沢温泉" },
+          { "prefecture": "新潟県", "spa": "芝峠温泉" },
+          { "prefecture": "新潟県", "spa": "田中温泉" },
+          { "prefecture": "新潟県", "spa": "逆巻温泉" },
+          { "prefecture": "新潟県", "spa": "辰の口温泉" },
+          { "prefecture": "新潟県", "spa": "鹿渡温泉" },
+          { "prefecture": "新潟県", "spa": "蓮華温泉" },
+          { "prefecture": "新潟県", "spa": "雨飾温泉" },
+          { "prefecture": "新潟県", "spa": "長者温泉" },
+          { "prefecture": "新潟県", "spa": "宇津俣温泉" },
+          { "prefecture": "新潟県", "spa": "その他" },
+          { "prefecture": "長野県", "spa": "野沢温泉" },
+          { "prefecture": "長野県", "spa": "別所温泉" },
+          { "prefecture": "長野県", "spa": "乗鞍高原温泉" },
+          { "prefecture": "長野県", "spa": "渋温泉" },
+          { "prefecture": "長野県", "spa": "白馬八方温泉" },
+          { "prefecture": "長野県", "spa": "戸倉上山田温泉" },
+          { "prefecture": "長野県", "spa": "上諏訪温泉" },
+          { "prefecture": "長野県", "spa": "浅間温泉" },
+          { "prefecture": "長野県", "spa": "湯田中温泉" },
+          { "prefecture": "長野県", "spa": "鹿教湯温泉" },
+          { "prefecture": "長野県", "spa": "下諏訪温泉" },
+          { "prefecture": "長野県", "spa": "昼神温泉郷" },
+          { "prefecture": "長野県", "spa": "安曇野穂高温泉郷" },
+          { "prefecture": "長野県", "spa": "白骨温泉" },
+          { "prefecture": "長野県", "spa": "大町温泉郷" },
+          { "prefecture": "長野県", "spa": "穂波温泉" },
+          { "prefecture": "長野県", "spa": "山田温泉" },
+          { "prefecture": "長野県", "spa": "切明温泉" },
+          { "prefecture": "長野県", "spa": "安代温泉" },
+          { "prefecture": "長野県", "spa": "霊泉寺温泉" },
+          { "prefecture": "長野県", "spa": "熊の湯ほたる温泉" },
+          { "prefecture": "長野県", "spa": "田沢温泉" },
+          { "prefecture": "長野県", "spa": "奈川温泉" },
+          { "prefecture": "長野県", "spa": "松代温泉" },
+          { "prefecture": "長野県", "spa": "七味温泉" },
+          { "prefecture": "長野県", "spa": "上林温泉" },
+          { "prefecture": "長野県", "spa": "志賀山温泉" },
+          { "prefecture": "長野県", "spa": "沓掛温泉" },
+          { "prefecture": "長野県", "spa": "菱野温泉" },
+          { "prefecture": "長野県", "spa": "奥蓼科温泉郷" },
+          { "prefecture": "長野県", "spa": "白馬塩の道温泉" },
+          { "prefecture": "長野県", "spa": "奥山田温泉" },
+          { "prefecture": "長野県", "spa": "新湯田中温泉" },
+          { "prefecture": "長野県", "spa": "発哺温泉" },
+          { "prefecture": "長野県", "spa": "幕岩温泉" },
+          { "prefecture": "長野県", "spa": "毒沢鉱泉" },
+          { "prefecture": "長野県", "spa": "天竜峡温泉" },
+          { "prefecture": "長野県", "spa": "小谷温泉" },
+          { "prefecture": "長野県", "spa": "葛温泉" },
+          { "prefecture": "長野県", "spa": "姫川温泉" },
+          { "prefecture": "長野県", "spa": "不動温泉" },
+          { "prefecture": "長野県", "spa": "たかまがはら温泉" },
+          { "prefecture": "長野県", "spa": "蕨温泉" },
+          { "prefecture": "長野県", "spa": "黒姫温泉" },
+          { "prefecture": "長野県", "spa": "望月温泉" },
+          { "prefecture": "長野県", "spa": "扉温泉" },
+          { "prefecture": "長野県", "spa": "鹿塩温泉" },
+          { "prefecture": "長野県", "spa": "高遠温泉" },
+          { "prefecture": "長野県", "spa": "南木曽温泉" },
+          { "prefecture": "長野県", "spa": "富貴畑温泉郷" },
+          { "prefecture": "長野県", "spa": "金熊温泉" },
+          { "prefecture": "長野県", "spa": "仙仁温泉" },
+          { "prefecture": "長野県", "spa": "保科温泉" },
+          { "prefecture": "長野県", "spa": "稲荷山温泉" },
+          { "prefecture": "長野県", "spa": "奥裾花温泉" },
+          { "prefecture": "長野県", "spa": "森温泉" },
+          { "prefecture": "長野県", "spa": "中尾山温泉" },
+          { "prefecture": "長野県", "spa": "五色温泉" },
+          { "prefecture": "長野県", "spa": "地獄谷温泉" },
+          { "prefecture": "長野県", "spa": "湯の沢温泉" },
+          { "prefecture": "長野県", "spa": "木戸池温泉" },
+          { "prefecture": "長野県", "spa": "馬曲温泉" },
+          { "prefecture": "長野県", "spa": "屋敷温泉" },
+          { "prefecture": "長野県", "spa": "中条温泉" },
+          { "prefecture": "長野県", "spa": "和山温泉" },
+          { "prefecture": "長野県", "spa": "角間温泉" },
+          { "prefecture": "長野県", "spa": "大塩温泉" },
+          { "prefecture": "長野県", "spa": "岳の湯温泉" },
+          { "prefecture": "長野県", "spa": "あずまや温泉" },
+          { "prefecture": "長野県", "spa": "中棚温泉" },
+          { "prefecture": "長野県", "spa": "高峰温泉" },
+          { "prefecture": "長野県", "spa": "信州八重原温泉" },
+          { "prefecture": "長野県", "spa": "天狗温泉" },
+          { "prefecture": "長野県", "spa": "湯ノ瀬温泉" },
+          { "prefecture": "長野県", "spa": "奈良原温泉" },
+          { "prefecture": "長野県", "spa": "星野温泉" },
+          { "prefecture": "長野県", "spa": "千ヶ滝温泉" },
+          { "prefecture": "長野県", "spa": "塩壺温泉" },
+          { "prefecture": "長野県", "spa": "ゆうすげ温泉" },
+          { "prefecture": "長野県", "spa": "佐久一萬里温泉" },
+          { "prefecture": "長野県", "spa": "稲子湯温泉" },
+          { "prefecture": "長野県", "spa": "春日温泉" },
+          { "prefecture": "長野県", "spa": "海ノ口温泉" },
+          { "prefecture": "長野県", "spa": "洞源湖温泉" },
+          { "prefecture": "長野県", "spa": "本沢温泉" },
+          { "prefecture": "長野県", "spa": "広原温泉" },
+          { "prefecture": "長野県", "spa": "唐沢鉱泉" },
+          { "prefecture": "長野県", "spa": "白樺湖池の平温泉" },
+          { "prefecture": "長野県", "spa": "坂巻温泉" },
+          { "prefecture": "長野県", "spa": "中の湯温泉" },
+          { "prefecture": "長野県", "spa": "新奈川温泉" },
+          { "prefecture": "長野県", "spa": "崖ノ湯温泉" },
+          { "prefecture": "長野県", "spa": "穴沢温泉" },
+          { "prefecture": "長野県", "spa": "草湯温泉" },
+          { "prefecture": "長野県", "spa": "差切峡温泉" },
+          { "prefecture": "長野県", "spa": "天徳鉱泉" },
+          { "prefecture": "長野県", "spa": "高ボッチ温泉" },
+          { "prefecture": "長野県", "spa": "小渋温泉" },
+          { "prefecture": "長野県", "spa": "信州平谷温泉" },
+          { "prefecture": "長野県", "spa": "信州まつかわ温泉" },
+          { "prefecture": "長野県", "spa": "信州たかもり温泉" },
+          { "prefecture": "長野県", "spa": "月川温泉" },
+          { "prefecture": "長野県", "spa": "木曾駒天神温泉" },
+          { "prefecture": "長野県", "spa": "釜沼温泉" },
+          { "prefecture": "長野県", "spa": "駒の湯温泉" },
+          { "prefecture": "長野県", "spa": "木曽御嶽温泉" },
+          { "prefecture": "長野県", "spa": "鹿の瀬温泉" },
+          { "prefecture": "長野県", "spa": "鹿の湯温泉" },
+          { "prefecture": "長野県", "spa": "灰沢鉱泉" },
+          { "prefecture": "長野県", "spa": "中房温泉" },
+          { "prefecture": "長野県", "spa": "安曇野みさと温泉" },
+          { "prefecture": "長野県", "spa": "有明温泉" },
+          { "prefecture": "長野県", "spa": "馬羅尾天狗岩温泉" },
+          { "prefecture": "長野県", "spa": "来馬温泉" },
+          { "prefecture": "長野県", "spa": "木崎湖温泉" },
+          { "prefecture": "長野県", "spa": "奉納温泉" },
+          { "prefecture": "長野県", "spa": "白馬鑓温泉" },
+          { "prefecture": "長野県", "spa": "島温泉" },
+          { "prefecture": "長野県", "spa": "美麻温泉" },
+          { "prefecture": "長野県", "spa": "その他" },
+          { "prefecture": "山梨県", "spa": "石和温泉" },
+          { "prefecture": "山梨県", "spa": "河口湖温泉郷" },
+          { "prefecture": "山梨県", "spa": "下部温泉" },
+          { "prefecture": "山梨県", "spa": "湯村温泉" },
+          { "prefecture": "山梨県", "spa": "芦安温泉" },
+          { "prefecture": "山梨県", "spa": "忍野温泉" },
+          { "prefecture": "山梨県", "spa": "富士山中湖温泉" },
+          { "prefecture": "山梨県", "spa": "十谷温泉" },
+          { "prefecture": "山梨県", "spa": "豊富温泉" },
+          { "prefecture": "山梨県", "spa": "佐野川温泉" },
+          { "prefecture": "山梨県", "spa": "西山温泉" },
+          { "prefecture": "山梨県", "spa": "富士五湖鐘山温泉" },
+          { "prefecture": "山梨県", "spa": "桃の木温泉" },
+          { "prefecture": "山梨県", "spa": "笛吹川温泉" },
+          { "prefecture": "山梨県", "spa": "裂石温泉" },
+          { "prefecture": "山梨県", "spa": "川浦温泉" },
+          { "prefecture": "山梨県", "spa": "神の湯温泉" },
+          { "prefecture": "山梨県", "spa": "岩下温泉" },
+          { "prefecture": "山梨県", "spa": "積翠寺温泉" },
+          { "prefecture": "山梨県", "spa": "創造の森温泉" },
+          { "prefecture": "山梨県", "spa": "春日居温泉" },
+          { "prefecture": "山梨県", "spa": "金山鉱泉" },
+          { "prefecture": "山梨県", "spa": "赤石温泉" },
+          { "prefecture": "山梨県", "spa": "小淵沢温泉" },
+          { "prefecture": "山梨県", "spa": "奈良田温泉" },
+          { "prefecture": "山梨県", "spa": "雨畑湖温泉" },
+          { "prefecture": "山梨県", "spa": "光源の里温泉" },
+          { "prefecture": "山梨県", "spa": "青木鉱泉" },
+          { "prefecture": "山梨県", "spa": "その他" },
+          { "prefecture": "富山県", "spa": "宇奈月温泉" },
+          { "prefecture": "富山県", "spa": "鐘釣温泉" },
+          { "prefecture": "富山県", "spa": "桜ヶ池温泉" },
+          { "prefecture": "富山県", "spa": "北山鉱泉" },
+          { "prefecture": "富山県", "spa": "岩井戸温泉" },
+          { "prefecture": "富山県", "spa": "祖母谷温泉" },
+          { "prefecture": "富山県", "spa": "天神山温泉" },
+          { "prefecture": "富山県", "spa": "黒薙温泉" },
+          { "prefecture": "富山県", "spa": "名剣温泉" },
+          { "prefecture": "富山県", "spa": "欅平温泉" },
+          { "prefecture": "富山県", "spa": "みくりが池温泉" },
+          { "prefecture": "富山県", "spa": "岩稲温泉" },
+          { "prefecture": "富山県", "spa": "湯神子温泉" },
+          { "prefecture": "富山県", "spa": "亀谷温泉" },
+          { "prefecture": "富山県", "spa": "鯰温泉" },
+          { "prefecture": "富山県", "spa": "越中山田温泉" },
+          { "prefecture": "富山県", "spa": "青井谷温泉" },
+          { "prefecture": "富山県", "spa": "法林寺温泉" },
+          { "prefecture": "富山県", "spa": "大牧温泉" },
+          { "prefecture": "富山県", "spa": "ふくみつ華山温泉" },
+          { "prefecture": "富山県", "spa": "天竺温泉" },
+          { "prefecture": "富山県", "spa": "高窪温泉" },
+          { "prefecture": "富山県", "spa": "川合田温泉" },
+          { "prefecture": "富山県", "spa": "福光温泉" },
+          { "prefecture": "富山県", "spa": "庄川温泉郷" },
+          { "prefecture": "富山県", "spa": "その他" },
+          { "prefecture": "石川県", "spa": "山代温泉" },
+          { "prefecture": "石川県", "spa": "山中温泉" },
+          { "prefecture": "石川県", "spa": "和倉温泉" },
+          { "prefecture": "石川県", "spa": "粟津温泉" },
+          { "prefecture": "石川県", "spa": "片山津温泉" },
+          { "prefecture": "石川県", "spa": "湯涌温泉" },
+          { "prefecture": "石川県", "spa": "白峰温泉" },
+          { "prefecture": "石川県", "spa": "輪島温泉" },
+          { "prefecture": "石川県", "spa": "中宮温泉" },
+          { "prefecture": "石川県", "spa": "白山温泉" },
+          { "prefecture": "石川県", "spa": "深谷温泉" },
+          { "prefecture": "石川県", "spa": "河内千丈温泉" },
+          { "prefecture": "石川県", "spa": "手取温泉" },
+          { "prefecture": "石川県", "spa": "赤穂谷温泉" },
+          { "prefecture": "石川県", "spa": "ねぶた温泉" },
+          { "prefecture": "石川県", "spa": "門前温泉" },
+          { "prefecture": "石川県", "spa": "湯川温泉" },
+          { "prefecture": "石川県", "spa": "柳田温泉" },
+          { "prefecture": "石川県", "spa": "禄剛崎温泉" },
+          { "prefecture": "石川県", "spa": "その他" },
+          { "prefecture": "福井県", "spa": "芦原温泉" },
+          { "prefecture": "福井県", "spa": "三国温泉" },
+          { "prefecture": "福井県", "spa": "越前玉川温泉" },
+          { "prefecture": "福井県", "spa": "佐野温泉" },
+          { "prefecture": "福井県", "spa": "美山森林温泉" },
+          { "prefecture": "福井県", "spa": "鷹巣温泉" },
+          { "prefecture": "福井県", "spa": "丸岡温泉" },
+          { "prefecture": "福井県", "spa": "東尋坊温泉" },
+          { "prefecture": "福井県", "spa": "九頭竜温泉" },
+          { "prefecture": "福井県", "spa": "鳩ヶ湯温泉" },
+          { "prefecture": "福井県", "spa": "花みずき温泉" },
+          { "prefecture": "福井県", "spa": "三六温泉" },
+          { "prefecture": "福井県", "spa": "しきぶ温泉" },
+          { "prefecture": "福井県", "spa": "花はす温泉" },
+          { "prefecture": "福井県", "spa": "渓流温泉" },
+          { "prefecture": "福井県", "spa": "敦賀トンネル温泉" },
+          { "prefecture": "福井県", "spa": "虹岳島温泉" },
+          { "prefecture": "福井県", "spa": "その他" },
+          { "prefecture": "岐阜県", "spa": "下呂温泉" },
+          { "prefecture": "岐阜県", "spa": "平湯温泉" },
+          { "prefecture": "岐阜県", "spa": "新穂高温泉" },
+          { "prefecture": "岐阜県", "spa": "新平湯温泉" },
+          { "prefecture": "岐阜県", "spa": "福地温泉" },
+          { "prefecture": "岐阜県", "spa": "濁河温泉" },
+          { "prefecture": "岐阜県", "spa": "長良川温泉" },
+          { "prefecture": "岐阜県", "spa": "栃尾温泉" },
+          { "prefecture": "岐阜県", "spa": "白川郷平瀬温泉" },
+          { "prefecture": "岐阜県", "spa": "白川温泉" },
+          { "prefecture": "岐阜県", "spa": "柿野温泉" },
+          { "prefecture": "岐阜県", "spa": "恵那峡源泉" },
+          { "prefecture": "岐阜県", "spa": "鬼岩温泉" },
+          { "prefecture": "岐阜県", "spa": "湯の洞温泉" },
+          { "prefecture": "岐阜県", "spa": "下島温泉" },
+          { "prefecture": "岐阜県", "spa": "湯屋温泉" },
+          { "prefecture": "岐阜県", "spa": "白狐温泉" },
+          { "prefecture": "岐阜県", "spa": "高畑温泉" },
+          { "prefecture": "岐阜県", "spa": "飛騨金山温泉" },
+          { "prefecture": "岐阜県", "spa": "塩沢温泉" },
+          { "prefecture": "岐阜県", "spa": "臥龍温泉" },
+          { "prefecture": "岐阜県", "spa": "飛騨川古川桃源郷温泉" },
+          { "prefecture": "岐阜県", "spa": "うすずみ温泉" },
+          { "prefecture": "岐阜県", "spa": "ローソク温泉" },
+          { "prefecture": "岐阜県", "spa": "岩寿温泉" },
+          { "prefecture": "岐阜県", "spa": "渡合温泉" },
+          { "prefecture": "岐阜県", "spa": "山神温泉" },
+          { "prefecture": "岐阜県", "spa": "釜戸温泉" },
+          { "prefecture": "岐阜県", "spa": "明世温泉" },
+          { "prefecture": "岐阜県", "spa": "神明温泉" },
+          { "prefecture": "岐阜県", "spa": "南飛騨馬瀬川温泉" },
+          { "prefecture": "岐阜県", "spa": "乗政温泉" },
+          { "prefecture": "岐阜県", "spa": "萩原温泉" },
+          { "prefecture": "岐阜県", "spa": "宮川温泉" },
+          { "prefecture": "岐阜県", "spa": "秋神温泉" },
+          { "prefecture": "岐阜県", "spa": "飛騨数河温泉" },
+          { "prefecture": "岐阜県", "spa": "その他" },
+          { "prefecture": "静岡県", "spa": "堂ヶ島温泉" },
+          { "prefecture": "静岡県", "spa": "弓ヶ浜温泉" },
+          { "prefecture": "静岡県", "spa": "雲見温泉" },
+          { "prefecture": "静岡県", "spa": "網代温泉" },
+          { "prefecture": "静岡県", "spa": "宇佐美温泉" },
+          { "prefecture": "静岡県", "spa": "やいづ黒潮温泉" },
+          { "prefecture": "静岡県", "spa": "湯ヶ島温泉" },
+          { "prefecture": "静岡県", "spa": "蓮台寺温泉" },
+          { "prefecture": "静岡県", "spa": "舘山寺温泉" },
+          { "prefecture": "静岡県", "spa": "北川温泉" },
+          { "prefecture": "静岡県", "spa": "松崎温泉" },
+          { "prefecture": "静岡県", "spa": "伊豆山温泉" },
+          { "prefecture": "静岡県", "spa": "伊豆湯河原温泉" },
+          { "prefecture": "静岡県", "spa": "峰温泉" },
+          { "prefecture": "静岡県", "spa": "戸田温泉" },
+          { "prefecture": "静岡県", "spa": "大川温泉" },
+          { "prefecture": "静岡県", "spa": "河津浜温泉" },
+          { "prefecture": "静岡県", "spa": "石部温泉" },
+          { "prefecture": "静岡県", "spa": "七滝温泉" },
+          { "prefecture": "静岡県", "spa": "大仁温泉" },
+          { "prefecture": "静岡県", "spa": "畑毛温泉" },
+          { "prefecture": "静岡県", "spa": "大沢温泉" },
+          { "prefecture": "静岡県", "spa": "伊豆多賀温泉" },
+          { "prefecture": "静岡県", "spa": "赤沢温泉" },
+          { "prefecture": "静岡県", "spa": "片瀬温泉" },
+          { "prefecture": "静岡県", "spa": "今井浜温泉" },
+          { "prefecture": "静岡県", "spa": "宇久須温泉" },
+          { "prefecture": "静岡県", "spa": "倉真温泉" },
+          { "prefecture": "静岡県", "spa": "竹倉温泉" },
+          { "prefecture": "静岡県", "spa": "大滝温泉" },
+          { "prefecture": "静岡県", "spa": "湯ヶ野温泉" },
+          { "prefecture": "静岡県", "spa": "下田白浜温泉" },
+          { "prefecture": "静岡県", "spa": "吉奈温泉" },
+          { "prefecture": "静岡県", "spa": "法泉寺温泉" },
+          { "prefecture": "静岡県", "spa": "城ヶ崎温泉" },
+          { "prefecture": "静岡県", "spa": "浮山温泉" },
+          { "prefecture": "静岡県", "spa": "観音温泉" },
+          { "prefecture": "静岡県", "spa": "駒ノ湯温泉" },
+          { "prefecture": "静岡県", "spa": "船原温泉" },
+          { "prefecture": "静岡県", "spa": "創造沢温泉" },
+          { "prefecture": "静岡県", "spa": "祢宜之畑温泉" },
+          { "prefecture": "静岡県", "spa": "山王峡温泉" },
+          { "prefecture": "静岡県", "spa": "ゆうとう温泉" },
+          { "prefecture": "静岡県", "spa": "接岨峡温泉" },
+          { "prefecture": "静岡県", "spa": "白沢温泉" },
+          { "prefecture": "静岡県", "spa": "その他" },
+          { "prefecture": "愛知県", "spa": "湯谷温泉" },
+          { "prefecture": "愛知県", "spa": "南知多温泉郷" },
+          { "prefecture": "愛知県", "spa": "みはま温泉" },
+          { "prefecture": "愛知県", "spa": "坂井温泉" },
+          { "prefecture": "愛知県", "spa": "笹戸温泉" },
+          { "prefecture": "愛知県", "spa": "夏焼温泉" },
+          { "prefecture": "愛知県", "spa": "白鷺温泉" },
+          { "prefecture": "愛知県", "spa": "榊野温泉" },
+          { "prefecture": "愛知県", "spa": "猿投温泉" },
+          { "prefecture": "愛知県", "spa": "赤引温泉" },
+          { "prefecture": "愛知県", "spa": "塩津温泉" },
+          { "prefecture": "愛知県", "spa": "添沢温泉" },
+          { "prefecture": "愛知県", "spa": "その他" },
+          { "prefecture": "三重県", "spa": "湯の山温泉" },
+          { "prefecture": "三重県", "spa": "バカ温泉" },
+          { "prefecture": "三重県", "spa": "香肌峡温泉" },
+          { "prefecture": "三重県", "spa": "浜島温泉郷" },
+          { "prefecture": "三重県", "spa": "長島温泉" },
+          { "prefecture": "三重県", "spa": "赤目温泉" },
+          { "prefecture": "三重県", "spa": "鳥羽本浦温泉" },
+          { "prefecture": "三重県", "spa": "答志島温泉" },
+          { "prefecture": "三重県", "spa": "木曽岬温泉" },
+          { "prefecture": "三重県", "spa": "磯部わたかの温泉" },
+          { "prefecture": "三重県", "spa": "猪の倉温泉" },
+          { "prefecture": "三重県", "spa": "磨洞温泉" },
+          { "prefecture": "三重県", "spa": "香落渓温泉" },
+          { "prefecture": "三重県", "spa": "奥伊勢宮川温泉" },
+          { "prefecture": "三重県", "spa": "湯ノ口温泉" },
+          { "prefecture": "三重県", "spa": "入鹿温泉" },
+          { "prefecture": "三重県", "spa": "その他" },
+          { "prefecture": "滋賀県", "spa": "おごと温泉" },
+          { "prefecture": "滋賀県", "spa": "マキノ白谷温泉" },
+          { "prefecture": "滋賀県", "spa": "石山温泉" },
+          { "prefecture": "滋賀県", "spa": "長浜太閤温泉" },
+          { "prefecture": "滋賀県", "spa": "南郷温泉" },
+          { "prefecture": "滋賀県", "spa": "びわ湖温泉" },
+          { "prefecture": "滋賀県", "spa": "彦根千乃松原温泉" },
+          { "prefecture": "滋賀県", "spa": "宮乃温泉" },
+          { "prefecture": "滋賀県", "spa": "かもしか温泉" },
+          { "prefecture": "滋賀県", "spa": "塩野温泉" },
+          { "prefecture": "滋賀県", "spa": "須賀谷温泉" },
+          { "prefecture": "滋賀県", "spa": "尾上温泉" },
+          { "prefecture": "滋賀県", "spa": "あど川宝船温泉" },
+          { "prefecture": "滋賀県", "spa": "その他" },
+          { "prefecture": "京都府", "spa": "夕日ヶ浦温泉" },
+          { "prefecture": "京都府", "spa": "久美の浜温泉郷" },
+          { "prefecture": "京都府", "spa": "湯の花温泉" },
+          { "prefecture": "京都府", "spa": "宮津温泉" },
+          { "prefecture": "京都府", "spa": "るり渓温泉" },
+          { "prefecture": "京都府", "spa": "嵐山温泉" },
+          { "prefecture": "京都府", "spa": "奥橋立伊根温泉" },
+          { "prefecture": "京都府", "spa": "湯らゆら温泉郷" },
+          { "prefecture": "京都府", "spa": "木津温泉" },
+          { "prefecture": "京都府", "spa": "京都竹の郷温泉" },
+          { "prefecture": "京都府", "spa": "くらま温泉" },
+          { "prefecture": "京都府", "spa": "桃山温泉" },
+          { "prefecture": "京都府", "spa": "おおみや小町温泉" },
+          { "prefecture": "京都府", "spa": "その他" },
+          { "prefecture": "奈良県", "spa": "大峯山洞川温泉" },
+          { "prefecture": "奈良県", "spa": "湯泉地温泉" },
+          { "prefecture": "奈良県", "spa": "信貴山温泉" },
+          { "prefecture": "奈良県", "spa": "湯盛温泉" },
+          { "prefecture": "奈良県", "spa": "吉野山温泉" },
+          { "prefecture": "奈良県", "spa": "宝来温泉" },
+          { "prefecture": "奈良県", "spa": "平城宮温泉" },
+          { "prefecture": "奈良県", "spa": "みはる温泉" },
+          { "prefecture": "奈良県", "spa": "長谷寺温泉" },
+          { "prefecture": "奈良県", "spa": "本郷温泉" },
+          { "prefecture": "奈良県", "spa": "奥香落温泉" },
+          { "prefecture": "奈良県", "spa": "入之波温泉" },
+          { "prefecture": "奈良県", "spa": "雲之上温泉" },
+          { "prefecture": "奈良県", "spa": "十津川上湯温泉" },
+          { "prefecture": "奈良県", "spa": "その他" },
+          { "prefecture": "和歌山県", "spa": "南紀白浜温泉" },
+          { "prefecture": "and和歌山県", "spa": "南紀勝浦温泉" },
+          { "prefecture": "和歌山県", "spa": "湯の峰温泉" },
+          { "prefecture": "和歌山県", "spa": "川湯温泉" },
+          { "prefecture": "and和歌山県", "spa": "南紀湯川温泉" },
+          { "prefecture": "and和歌山県", "spa": "椿温泉" },
+          { "prefecture": "和歌山県", "spa": "すさみ温泉" },
+          { "prefecture": "和歌山県", "spa": "渡瀬温泉" },
+          { "prefecture": "和歌山県", "spa": "加太温泉" },
+          { "prefecture": "and和歌山県", "spa": "美山温泉" },
+          { "prefecture": "和歌山県", "spa": "中津温泉" },
+          { "prefecture": "and和歌山県", "spa": "みなべ温泉" },
+          { "prefecture": "和歌山県", "spa": "花山温泉" },
+          { "prefecture": "和歌山県", "spa": "紀伊見温泉" },
+          { "prefecture": "和歌山県", "spa": "美里温泉" },
+          { "prefecture": "和歌山県", "spa": "しみず温泉" },
+          { "prefecture": "和歌山県", "spa": "滝原温泉" },
+          { "prefecture": "和歌山県", "spa": "湯浅温泉" },
+          { "prefecture": "and和歌山県", "spa": "紀州みなべ千里浜温泉" },
+          { "prefecture": "和歌山県", "spa": "夏山温泉" },
+          { "prefecture": "和歌山県", "spa": "南紀月野瀬温泉" },
+          { "prefecture": "和歌山県", "spa": "湯ノ谷温泉" },
+          { "prefecture": "和歌山県", "spa": "日置川温泉" },
+          { "prefecture": "和歌山県", "spa": "雲取温泉" },
+          { "prefecture": "和歌山県", "spa": "熊野川温泉" },
+          { "prefecture": "和歌山県", "spa": "その他" },
+          { "prefecture": "大阪府", "spa": "犬鳴山温泉" },
+          { "prefecture": "大阪府", "spa": "伏尾温泉" },
+          { "prefecture": "大阪府", "spa": "摂津峡花の里温泉" },
+          { "prefecture": "大阪府", "spa": "箕面温泉" },
+          { "prefecture": "大阪府", "spa": "汐の湯温泉" },
+          { "prefecture": "大阪府", "spa": "牛滝温泉" },
+          { "prefecture": "大阪府", "spa": "泉州温泉" },
+          { "prefecture": "大阪府", "spa": "奥水間温泉" },
+          { "prefecture": "大阪府", "spa": "石切温泉" },
+          { "prefecture": "大阪府", "spa": "富田林嶽山温泉" },
+          { "prefecture": "大阪府", "spa": "天見温泉" },
+          { "prefecture": "大阪府", "spa": "その他" },
+          { "prefecture": "兵庫県", "spa": "有馬温泉" },
+          { "prefecture": "兵庫県", "spa": "湯村温泉" },
+          { "prefecture": "兵庫県", "spa": "浜坂温泉郷" },
+          { "prefecture": "兵庫県", "spa": "南淡路温泉郷" },
+          { "prefecture": "兵庫県", "spa": "武田尾温泉" },
+          { "prefecture": "兵庫県", "spa": "赤穂温泉" },
+          { "prefecture": "兵庫県", "spa": "竹野温泉" },
+          { "prefecture": "兵庫県", "spa": "籠坊温泉" },
+          { "prefecture": "兵庫県", "spa": "淡路島いちのみや温泉" },
+          { "prefecture": "兵庫県", "spa": "岩屋温泉" },
+          { "prefecture": "兵庫県", "spa": "奥猪名笹尾温泉" },
+          { "prefecture": "兵庫県", "spa": "かさがた温泉" },
+          { "prefecture": "兵庫県", "spa": "草山温泉" },
+          { "prefecture": "兵庫県", "spa": "出石温泉" },
+          { "prefecture": "兵庫県", "spa": "大沢温泉" },
+          { "prefecture": "兵庫県", "spa": "神戸みなと温泉" },
+          { "prefecture": "兵庫県", "spa": "東条温泉" },
+          { "prefecture": "兵庫県", "spa": "加古川温泉" },
+          { "prefecture": "兵庫県", "spa": "やしろ夢園温泉" },
+          { "prefecture": "兵庫県", "spa": "波賀温泉" },
+          { "prefecture": "兵庫県", "spa": "生谷温泉" },
+          { "prefecture": "兵庫県", "spa": "日和山温泉" },
+          { "prefecture": "兵庫県", "spa": "But東温泉" },
+          { "prefecture": "兵庫県", "spa": "やぶ温泉" },
+          { "prefecture": "兵庫県", "spa": "その他" },
+          { "prefecture": "鳥取県", "spa": "皆生温泉" },
+          { "prefecture": "鳥取県", "spa": "ジグザグ温泉" },
+          { "prefecture": "鳥取県", "spa": "はわい温泉" },
+          { "prefecture": "鳥取県", "spa": "浜村温泉" },
+          { "prefecture": "鳥取県", "spa": "鹿野温泉" },
+          { "prefecture": "鳥取県", "spa": "岩井温泉" },
+          { "prefecture": "鳥取県", "spa": "東郷温泉" },
+          { "prefecture": "鳥取県", "spa": "関金温泉" },
+          { "prefecture": "鳥取県", "spa": "日吉津温泉" },
+          { "prefecture": "鳥取県", "spa": "大山伽羅温泉" },
+          { "prefecture": "鳥取県", "spa": "その他" },
+          { "prefecture": "島根県", "spa": "玉造温泉" },
+          { "prefecture": "島根県", "spa": "有福温泉" },
+          { "prefecture": "島根県", "spa": "松江しんじ湖温泉" },
+          { "prefecture": "島根県", "spa": "湯の川温泉" },
+          { "prefecture": "島根県", "spa": "温泉津温泉" },
+          { "prefecture": "島根県", "spa": "鷺の湯温泉" },
+          { "prefecture": "島根県", "spa": "海潮温泉" },
+          { "prefecture": "島根県", "spa": "美又温泉" },
+          { "prefecture": "島根県", "spa": "三瓶温泉" },
+          { "prefecture": "島根県", "spa": "湯迫温泉" },
+          { "prefecture": "島根県", "spa": "湯抱温泉" },
+          { "prefecture": "島根県", "spa": "八雲温泉" },
+          { "prefecture": "島根県", "spa": "立久恵峡温泉" },
+          { "prefecture": "島根県", "spa": "出雲須佐温泉" },
+          { "prefecture": "島根県", "spa": "湯屋温泉" },
+          { "prefecture": "島根県", "spa": "いわみ温泉" },
+          { "prefecture": "島根県", "spa": "亀嵩温泉" },
+          { "prefecture": "島根県", "spa": "小田温泉" },
+          { "prefecture": "島根県", "spa": "斐乃上温泉" },
+          { "prefecture": "島根県", "spa": "えんや温泉" },
+          { "prefecture": "島根県", "spa": "小屋原温泉" },
+          { "prefecture": "島根県", "spa": "池田ラジウム温泉" },
+          { "prefecture": "島根県", "spa": "風 of 国温泉" },
+          { "prefecture": "島根県", "spa": "木部谷温泉" },
+          { "prefecture": "島根県", "spa": "匹見峡温泉" },
+          { "prefecture": "島根県", "spa": "大谷温泉" },
+          { "prefecture": "島根県", "spa": "荒磯温泉" },
+          { "prefecture": "島根県", "spa": "その他" },
+          { "prefecture": "岡山県", "spa": "湯原温泉" },
+          { "prefecture": "岡山県", "spa": "湯郷温泉" },
+          { "prefecture": "岡山県", "spa": "あわくら温泉" },
+          { "prefecture": "岡山県", "spa": "苫田温泉" },
+          { "prefecture": "岡山県", "spa": "ジグザグ温泉" },
+          { "prefecture": "岡山県", "spa": "あば温泉" },
+          { "prefecture": "岡山県", "spa": "岡山空港温泉" },
+          { "prefecture": "岡山県", "spa": "小森温泉" },
+          { "prefecture": "岡山県", "spa": "八幡温泉郷" },
+          { "prefecture": "岡山県", "spa": "粟井温泉" },
+          { "prefecture": "岡山県", "spa": "怒塚山温泉" },
+          { "prefecture": "岡山県", "spa": "和気鵜飼谷温泉" },
+          { "prefecture": "岡山県", "spa": "たまの温泉" },
+          { "prefecture": "岡山県", "spa": "鷲羽山吹上温泉" },
+          { "prefecture": "岡山県", "spa": "由加温泉" },
+          { "prefecture": "岡山県", "spa": "新見千屋温泉" },
+          { "prefecture": "岡山県", "spa": "上齋原温泉" },
+          { "prefecture": "岡山県", "spa": "真賀温泉" },
+          { "prefecture": "岡山県", "spa": "大芦高原温泉" },
+          { "prefecture": "岡山県", "spa": "百々温泉" },
+          { "prefecture": "岡山県", "spa": "武蔵温泉" },
+          { "prefecture": "岡山県", "spa": "足温泉" },
+          { "prefecture": "岡山県", "spa": "その他" },
+          { "prefecture": "広島県", "spa": "女鹿平温泉" },
+          { "prefecture": "広島県", "spa": "湯来温泉" },
+          { "prefecture": "広島県", "spa": "宮浜温泉" },
+          { "prefecture": "広島県", "spa": "湯の山温泉" },
+          { "prefecture": "広島県", "spa": "君田温泉" },
+          { "prefecture": "広島県", "spa": "香遊温泉" },
+          { "prefecture": "広島県", "spa": "千代田温泉" },
+          { "prefecture": "広島県", "spa": "小瀬川温泉" },
+          { "prefecture": "広島県", "spa": "潮原温泉" },
+          { "prefecture": "広島県", "spa": "瀬戸温泉" },
+          { "prefecture": "広島県", "spa": "養老温泉" },
+          { "prefecture": "広島県", "spa": "比和温泉" },
+          { "prefecture": "広島県", "spa": "庄原さくら温泉" },
+          { "prefecture": "広島県", "spa": "龍頭峡温泉" },
+          { "prefecture": "広島県", "spa": "筒賀温泉" },
+          { "prefecture": "広島県", "spa": "その他" },
+          { "prefecture": "山口県", "spa": "湯田温泉" },
+          { "prefecture": "山口県", "spa": "長門湯本温泉" },
+          { "prefecture": "山口県", "spa": "川棚温泉" },
+          { "prefecture": "山口県", "spa": "湯野温泉" },
+          { "prefecture": "山口県", "spa": "三丘温泉" },
+          { "prefecture": "山口県", "spa": "一の俣温泉" },
+          { "prefecture": "山口県", "spa": "俵山温泉" },
+          { "prefecture": "山口県", "spa": "光室積温泉" },
+          { "prefecture": "山口県", "spa": "大河内温泉" },
+          { "prefecture": "山口県", "spa": "持世寺温泉" },
+          { "prefecture": "山口県", "spa": "阿知須温泉" },
+          { "prefecture": "山口県", "spa": "萩本陣温泉" },
+          { "prefecture": "山口県", "spa": "湯ノ口温泉" },
+          { "prefecture": "山口県", "spa": "その他" },
+          { "prefecture": "徳島県", "spa": "大歩危温泉" },
+          { "prefecture": "徳島県", "spa": "神山温泉" },
+          { "prefecture": "徳島県", "spa": "わじき温泉" },
+          { "prefecture": "徳島県", "spa": "宍喰温泉" },
+          { "prefecture": "徳島県", "spa": "月ヶ谷温泉" },
+          { "prefecture": "徳島県", "spa": "四季美谷温泉" },
+          { "prefecture": "徳島県", "spa": "もみじ川温泉" },
+          { "prefecture": "徳島県", "spa": "祖谷温泉" },
+          { "prefecture": "徳島県", "spa": "新祖谷温泉" },
+          { "prefecture": "徳島県", "spa": "奥小歩危温泉" },
+          { "prefecture": "徳島県", "spa": "その他" },
+          { "prefecture": "香川県", "spa": "塩江温泉郷" },
+          { "prefecture": "香川県", "spa": "こんぴら温泉郷" },
+          { "prefecture": "香川県", "spa": "絹島温泉" },
+          { "prefecture": "香川県", "spa": "美霞洞温泉" },
+          { "prefecture": "香川県", "spa": "高松花樹海温泉" },
+          { "prefecture": "香川県", "spa": "湯元さぬき瀬戸大橋温泉" },
+          { "prefecture": "香川県", "spa": "白鳥温泉" },
+          { "prefecture": "香川県", "spa": "津田温泉" },
+          { "prefecture": "香川県", "spa": "黒川温泉" },
+          { "prefecture": "香川県", "spa": "美合温泉" },
+          { "prefecture": "香川県", "spa": "その他" },
+          { "prefecture": "愛媛県", "spa": "道後温泉" },
+          { "prefecture": "愛媛県", "spa": "鈍川温泉" },
+          { "prefecture": "愛媛県", "spa": "古岩屋温泉" },
+          { "prefecture": "愛媛県", "spa": "湯ノ浦温泉" },
+          { "prefecture": "愛媛県", "spa": "宝泉坊温泉" },
+          { "prefecture": "愛媛県", "spa": "奥道後温泉" },
+          { "prefecture": "愛媛県", "spa": "権現温泉" },
+          { "prefecture": "愛媛県", "spa": "成川温泉" },
+          { "prefecture": "愛媛県", "spa": "湯之谷温泉" },
+          { "prefecture": "愛媛県", "spa": "道前渓温泉" },
+          { "prefecture": "愛媛県", "spa": "一本松温泉" },
+          { "prefecture": "愛媛県", "spa": "その他" },
+          { "prefecture": "高知県", "spa": "夢の温泉" },
+          { "prefecture": "高知県", "spa": "よさこい温泉" },
+          { "prefecture": "高知県", "spa": "用井温泉" },
+          { "prefecture": "高知県", "spa": "龍河温泉" },
+          { "prefecture": "高知県", "spa": "木の香温泉" },
+          { "prefecture": "高知県", "spa": "蘇鶴温泉" },
+          { "prefecture": "高知県", "spa": "べふ峡温泉" },
+          { "prefecture": "高知県", "spa": "千舞温泉" },
+          { "prefecture": "高知県", "spa": "黒潮本陣温泉" },
+          { "prefecture": "高知県", "spa": "土佐山温泉" },
+          { "prefecture": "高知県", "spa": "三翠園温泉" },
+          { "prefecture": "高知県", "spa": "四万十源流の湯温泉" },
+          { "prefecture": "高知県", "spa": "馬路温泉" },
+          { "prefecture": "高知県", "spa": "松葉川温泉" },
+          { "prefecture": "高知県", "spa": "その他" },
+          { "prefecture": "福岡県", "spa": "原鶴温泉" },
+          { "prefecture": "福岡県", "spa": "筑後川温泉" },
+          { "prefecture": "福岡県", "spa": "二日市温泉" },
+          { "prefecture": "福岡県", "spa": "その他" },
+          { "prefecture": "福岡県", "spa": "博多温泉" },
+          { "prefecture": "福岡県", "spa": "船小屋温泉" },
+          { "prefecture": "福岡県", "spa": "脇田温泉" },
+          { "prefecture": "福岡県", "spa": "久山温泉" },
+          { "prefecture": "福岡県", "spa": "求菩堤温泉" },
+          { "prefecture": "福岡県", "spa": "星野温泉" },
+          { "prefecture": "福岡県", "spa": "薬王寺温泉" },
+          { "prefecture": "福岡県", "spa": "櫨の里温泉" },
+          { "prefecture": "福岡県", "spa": "黒木平温泉" },
+          { "prefecture": "福岡県", "spa": "英彦山温泉" },
+          { "prefecture": "福岡県", "spa": "柿下温泉" },
+          { "prefecture": "福岡県", "spa": "その他" },
+          { "prefecture": "大分県", "spa": "由布院温泉" },
+          { "prefecture": "大分県", "spa": "別府温泉" },
+          { "prefecture": "大分県", "spa": "鉄輪温泉" },
+          { "prefecture": "大分県", "spa": "天ヶ瀬温泉" },
+          { "prefecture": "大分県", "spa": "湯平温泉" },
+          { "prefecture": "大分県", "spa": "筋湯温泉" },
+          { "prefecture": "大分県", "spa": "明礬温泉" },
+          { "prefecture": "大分県", "spa": "亀川温泉" },
+          { "prefecture": "大分県", "spa": "宝泉寺温泉" },
+          { "prefecture": "大分県", "spa": "浜脇温泉" },
+          { "prefecture": "大分県", "spa": "玖珠温泉" },
+          { "prefecture": "大分県", "spa": "湯坪温泉" },
+          { "prefecture": "大分県", "spa": "久住温泉" },
+          { "prefecture": "大分県", "spa": "深耶馬渓温泉" },
+          { "prefecture": "大分県", "spa": "堀田温泉" },
+          { "prefecture": "大分県", "spa": "観海寺温泉" },
+          { "prefecture": "大分県", "spa": "塚原温泉" },
+          { "prefecture": "大分県", "spa": "筌ノ口温泉" },
+          { "prefecture": "大分県", "spa": "日出温泉" },
+          { "prefecture": "大分県", "spa": "九酔渓温泉" },
+          { "prefecture": "大分県", "spa": "久住赤川温泉" },
+          { "prefecture": "大分県", "spa": "杵築温泉" },
+          { "prefecture": "大分県", "spa": "柴石温泉" },
+          { "prefecture": "大分県", "spa": "長者原温泉" },
+          { "prefecture": "大分県", "spa": "山香温泉" },
+          { "prefecture": "大分県", "spa": "国見温泉" },
+          { "prefecture": "大分県", "spa": "真玉温泉" },
+          { "prefecture": "大分県", "spa": "阿蘇野白水鉱泉" },
+          { "prefecture": "大分県", "spa": "壁湯温泉" },
+          { "prefecture": "大分県", "spa": "川底温泉" },
+          { "prefecture": "大分県", "spa": "生竜温泉" },
+          { "prefecture": "大分県", "spa": "牧ノ戸温泉" },
+          { "prefecture": "大分県", "spa": "七里田温泉" },
+          { "prefecture": "大分県", "spa": "法華院温泉" },
+          { "prefecture": "大分県", "spa": "湯ノ釣温泉" },
+          { "prefecture": "大分県", "spa": "その他" },
+          { "prefecture": "佐賀県", "spa": "武雄温泉" },
+          { "prefecture": "佐賀県", "spa": "古湯温泉" },
+          { "prefecture": "佐賀県", "spa": "熊の川温泉" },
+          { "prefecture": "佐賀県", "spa": "七山温泉" },
+          { "prefecture": "佐賀県", "spa": "寺浦温泉" },
+          { "prefecture": "佐賀県", "spa": "いろは島温泉" },
+          { "prefecture": "佐賀県", "spa": "その他" },
+          { "prefecture": "長崎県", "spa": "小浜温泉" },
+          { "prefecture": "長崎県", "spa": "湯ノ本温泉" },
+          { "prefecture": "長崎県", "spa": "大崎温泉" },
+          { "prefecture": "長崎県", "spa": "原城温泉" },
+          { "prefecture": "長崎県", "spa": "とぎつ天然温泉" },
+          { "prefecture": "長崎県", "spa": "西海橋温泉" },
+          { "prefecture": "長崎県", "spa": "平戸千里ヶ浜温泉" },
+          { "prefecture": "長崎県", "spa": "荒川温泉" },
+          { "prefecture": "長崎県", "spa": "鬼岳温泉" },
+          { "prefecture": "長崎県", "spa": "その他" },
+          { "prefecture": "熊本県", "spa": "黒川温泉" },
+          { "prefecture": "熊本県", "spa": "日奈久温泉" },
+          { "prefecture": "熊本県", "spa": "内牧温泉" },
+          { "prefecture": "熊本県", "spa": "平山温泉" },
+          { "prefecture": "熊本県", "spa": "天草下田温泉" },
+          { "prefecture": "熊本県", "spa": "松島温泉" },
+          { "prefecture": "熊本県", "spa": "山川温泉" },
+          { "prefecture": "熊本県", "spa": "植木温泉" },
+          { "prefecture": "熊本県", "spa": "小田温泉" },
+          { "prefecture": "熊本県", "spa": "湯の児温泉" },
+          { "prefecture": "熊本県", "spa": "岳の湯温泉" },
+          { "prefecture": "熊本県", "spa": "湯の鶴温泉" },
+          { "prefecture": "熊本県", "spa": "七城温泉" },
+          { "prefecture": "熊本県", "spa": "はげの湯温泉" },
+          { "prefecture": "熊本県", "spa": "満願寺温泉" },
+          { "prefecture": "熊本県", "spa": "栃木温泉" },
+          { "prefecture": "熊本県", "spa": "久木野温泉" },
+          { "prefecture": "熊本県", "spa": "熊入温泉" },
+          { "prefecture": "熊本県", "spa": "田の原温泉" },
+          { "prefecture": "熊本県", "spa": "菊鹿温泉" },
+          { "prefecture": "熊本県", "spa": "垂玉温泉" },
+          { "prefecture": "熊本県", "spa": "桃李温泉" },
+          { "prefecture": "熊本県", "spa": "菊南温泉" },
+          { "prefecture": "熊本県", "spa": "小天温泉" },
+          { "prefecture": "熊本県", "spa": "南黒川温泉" },
+          { "prefecture": "熊本県", "spa": "奥満願寺温泉" },
+          { "prefecture": "熊本県", "spa": "扇温泉" },
+          { "prefecture": "熊本県", "spa": "麻生釣温泉" },
+          { "prefecture": "熊本県", "spa": "阿蘇白水温泉" },
+          { "prefecture": "熊本県", "spa": "阿蘇赤水温泉" },
+          { "prefecture": "熊本県", "spa": "大阿蘇火の山温泉" },
+          { "prefecture": "熊本県", "spa": "四季の森温泉" },
+          { "prefecture": "熊本県", "spa": "山江温泉" },
+          { "prefecture": "熊本県", "spa": "一勝地温泉" },
+          { "prefecture": "熊本県", "spa": "さがら温泉" },
+          { "prefecture": "熊本県", "spa": "牛深温泉" },
+          { "prefecture": "熊本県", "spa": "河浦温泉" },
+          { "prefecture": "熊本県", "spa": "その他" },
+          { "prefecture": "宮崎県", "spa": "京町温泉郷" },
+          { "prefecture": "宮崎県", "spa": "青島温泉" },
+          { "prefecture": "宮崎県", "spa": "北郷温泉" },
+          { "prefecture": "宮崎県", "spa": "吉田温泉" },
+          { "prefecture": "宮崎県", "spa": "えびの高原温泉" },
+          { "prefecture": "宮崎県", "spa": "白鳥温泉" },
+          { "prefecture": "宮崎県", "spa": "曽山寺温泉" },
+          { "prefecture": "宮崎県", "spa": "綾温泉" },
+          { "prefecture": "宮崎県", "spa": "串間温泉" },
+          { "prefecture": "宮崎県", "spa": "湯之元温泉" },
+          { "prefecture": "宮崎県", "spa": "青井岳温泉" },
+          { "prefecture": "宮崎県", "spa": "極楽温泉" },
+          { "prefecture": "宮崎県", "spa": "高屋温泉" },
+          { "prefecture": "宮崎県", "spa": "その他" },
+          { "prefecture": "鹿児島県", "spa": "鹿児島市内温泉" },
+          { "prefecture": "鹿児島県", "spa": "日当山温泉" },
+          { "prefecture": "鹿児島県", "spa": "妙見温泉" },
+          { "prefecture": "鹿児島県", "spa": "市比野温泉" },
+          { "prefecture": "鹿児島県", "spa": "霧島神宮温泉郷" },
+          { "prefecture": "鹿児島県", "spa": "川内高城温泉" },
+          { "prefecture": "鹿児島県", "spa": "湯之元温泉" },
+          { "prefecture": "鹿児島県", "spa": "宮之城温泉" },
+          { "prefecture": "鹿児島県", "spa": "その他" },
+          { "prefecture": "鹿児島県", "spa": "紫尾温泉" },
+          { "prefecture": "鹿児島県", "spa": "新川温泉" },
+          { "prefecture": "鹿児島県", "spa": "古里温泉" },
+          { "prefecture": "鹿児島県", "spa": "伏目温泉" },
+          { "prefecture": "鹿児島県", "spa": "吹上温泉" },
+          { "prefecture": "鹿児島県", "spa": "藺牟田温泉" },
+          { "prefecture": "鹿児島県", "spa": "市来温泉" },
+          { "prefecture": "鹿児島県", "spa": "阿久根温泉" },
+          { "prefecture": "鹿児島県", "spa": "白木川内温泉" },
+          { "prefecture": "鹿児島県", "spa": "尾之間温泉" },
+          { "prefecture": "鹿児島県", "spa": "桜島マグマ温泉" },
+          { "prefecture": "鹿児島県", "spa": "成川温泉" },
+          { "prefecture": "鹿児島県", "spa": "湯川内温泉" },
+          { "prefecture": "鹿児島県", "spa": "観音滝温泉" },
+          { "prefecture": "鹿児島県", "spa": "栗野岳温泉" },
+          { "prefecture": "鹿児島県", "spa": "根占温泉" },
+          { "prefecture": "鹿児島県", "spa": "内之浦温泉" },
+          { "prefecture": "鹿児島県", "spa": "ダグリ温泉" },
+          { "prefecture": "鹿児島県", "spa": "その他" },
+          { "prefecture": "沖縄県", "spa": "山田温泉" },
+          { "prefecture": "沖縄県", "spa": "その他"  }
+        ];
+
+        const PREFECTURES = [
+            "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", 
+            "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", 
+            "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", 
+            "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", 
+            "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県", 
+            "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", 
+            "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"
+        ];
+
+        // 各種別のカラーコード
+        const FILL_COLORS = {
+            'すべて': '#bfdbfe'      // 青
+            ,'旅行(独り)': '#d1fae5' // 緑 (変更: #fecaca -> #d1fae5)
+            ,'旅行(友人)': '#f3e8ff' // 紫 (変更: #e0f2fe -> #f3e8ff)
+            ,'その他': '#e5e7eb'     // 灰色 (変更: #d1d5db -> #e5e7eb)
+            ,'温泉': '#fef9c3'       // 黄色 (変更: #bfdbfe -> #fef9c3)
+        };
+        const DEFAULT_COLOR = '#ffffff'; // 未訪問の色
+        const STROKE_COLORS = {
+            'すべて': '#3b82f6'      // blue-500（青）
+            ,'旅行(独り)': '#10b981' // emerald-500（緑） (変更: #ef4444 -> #10b981)
+            ,'旅行(友人)': '#a855f7' // purple-500（紫） (変更: #0ea5e9 -> #a855f7)
+            ,'other': '#9ca3af'     // gray-400（灰色） (変更: #6b7280 -> #9ca3af)
+            ,'温泉': '#eab308'       // yellow-500（黄色） (変更: #3b82f6 -> #eab308)
+        };
+        const DEFAULT_STROKE = '#d1d5db'; // 未訪問の線
+        
+        // 状態管理（旅行タイトル情報ベース）
+        let travelRecords = JSON.parse(localStorage.getItem('japanTravelRecords')) || [];
+        let visitedData = {};
+        
+        // 選択された都道府県・温泉を保持する配列
+        let selectedPrefs = [];
+        let selectedOnsens = [];
+
+        // 既存の地図描画や統計ロジックとの完全な互換性のために、
+        // travelRecordsから都道府県単位 of visitedDataを動的構築するヘルパー
+        function rebuildVisitedData() {
+            visitedData = {};
+            travelRecords.forEach(record => {
+                if (record.prefs && Array.isArray(record.prefs)) {
+                    record.prefs.forEach(pref => {
+                        if (!visitedData[pref]) {
+                            visitedData[pref] = [];
+                        }
+                        visitedData[pref].push({
+                            recordId: record.id,
+                            types: record.types,
+                            title: record.title,
+                            year: record.year,
+                            month: record.month,
+                            day: record.day,
+                            onsen: (record.onsens || []).join('、'),
+                            onsens: record.onsens || [],
+                            memo: record.memo,
+                            url: record.url || '', // URLの連携
+                            date: record.date
+                        });
+                    });
+                }
+            });
+        }
+
+        let d3PathElements = null;
+        let currentFilter = 'すべて'; // 現在のフィルター状態
+        let currentPrefFilter = 'すべて'; // 現在 of 都道府県フィルター状態
+        let editingPref = null;       // 編集中の都道府県名 (ダミーとして残す)
+        let editingIndex = null;      // 編集中のレコードインデックス (ダミーとして残す)
+        let editingRecordId = null;   // 編集中の旅行レコードID (nullの場合は新規)
+
+        // 達成フラグ管理 (初到達時のみ表示するため)
+        let achievedMilestones = JSON.parse(localStorage.getItem('achievedMilestones')) || {};
+        if (!achievedMilestones.percent) achievedMilestones.percent = [];
+        if (!achievedMilestones.count) achievedMilestones.count = [];
+        if (!achievedMilestones.soloPercent) achievedMilestones.soloPercent = [];
+        if (!achievedMilestones.friendsPercent) achievedMilestones.friendsPercent = [];
+        if (!achievedMilestones.otherPercent) achievedMilestones.otherPercent = [];
+        if (!achievedMilestones.onsenPercent) achievedMilestones.onsenPercent = [];
+
+        // DOM要素
+        const form = document.getElementById('record-form');
+        const prefSelect = document.getElementById('pref-select');
+        const memoInput = document.getElementById('memo-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const deleteBtn = document.getElementById('delete-btn');
+        const listContainer = document.getElementById('list-container');
+        const emptyState = document.getElementById('empty-state');
+        const visitedCount = document.getElementById('visited-count');
+        const visitedParcent = document.getElementById('visited-parcent');
+        const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+        const settingBtn = document.getElementById('open-settings-btn');
+        const settingsDialog = document.getElementById('settings-dialog');
+        const settingsDialogCloseBtn = document.getElementById('close-settings-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const inportBtn = document.getElementById('inport-btn');
+
+        // 新しく追加したDOM要素 (入力フォームダイアログ用)
+        const openFormBtn = document.getElementById('open-form-btn');
+        const formDialog = document.getElementById('form-dialog');
+        const closeFormBtn = document.getElementById('close-form-btn');
+
+        // 新規追加項目のDOM要素
+        const titleInput = document.getElementById('title-input');
+        const yearSelect = document.getElementById('year-select');
+        const monthSelect = document.getElementById('month-select');
+        const daySelect = document.getElementById('day-select');
+        const onsenInput = document.getElementById('onsen-input');
+        const urlInput = document.getElementById('url-input'); // URL用のDOM要素
+
+        // フィルタリング用のDOM要素
+        const prefFilterSelect = document.getElementById('pref-filter-select');
+        const typeFilterSelect = document.getElementById('type-filter-select');
+
+        // アプリケーションの初期化
+        async function init() {
+            initSelectBox();
+            updateAllViews();
+            setupEventListeners();
+            await renderMap();
+        }
+
+        // セレクトボックスの初期化
+        function initSelectBox() {
+            PREFECTURES.forEach(pref => {
+                const option = document.createElement('option');
+                option.value = pref;
+                option.textContent = pref;
+                prefSelect.appendChild(option);
+
+                // フィルター用の都道府県セレクトボックス
+                const filterOption = document.createElement('option');
+                filterOption.value = pref;
+                filterOption.textContent = pref;
+                prefFilterSelect.appendChild(filterOption);
+            });
+
+            // 年の生成 (1979年〜現在の年まで)
+            const currentYear = new Date().getFullYear();
+            const yearSelect = document.getElementById('year-select');
+            for (let y = currentYear; y >= 1979; y--) {
+                const option = document.createElement('option');
+                option.value = y;
+                option.textContent = y + '年';
+                yearSelect.appendChild(option);
+            }
+
+            // 月の生成 (1〜12)
+            const monthSelect = document.getElementById('month-select');
+            for (let m = 1; m <= 12; m++) {
+                const option = document.createElement('option');
+                option.value = m;
+                option.textContent = m + '月';
+                monthSelect.appendChild(option);
+            }
+
+            // 日の生成 (1〜31)
+            const daySelect = document.getElementById('day-select');
+            for (let d = 1; d <= 31; d++) {
+                const option = document.createElement('option');
+                option.value = d;
+                option.textContent = d + '日';
+                daySelect.appendChild(option);
+            }
+
+            // 都道府県セレクトボックスの変更イベント（バグ防止のため二重登録を排除）
+            prefSelect.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if (val && !selectedPrefs.includes(val)) {
+                    selectedPrefs.push(val);
+                    renderPrefBadges();
+                    updateOnsenDropdownOptions();
+                    updateMapColor(); // 地図の選択状態同期
+                }
+                e.target.value = ''; // 選択リセット
+            });
+
+            // 温泉セレクトボックスの変更イベント
+            onsenInput.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if (val && !selectedOnsens.includes(val)) {
+                    selectedOnsens.push(val);
+                    renderOnsenBadges();
+                }
+                e.target.value = ''; // 選択リセット
+            });
+        }
+
+        // 温泉ドロップダウンの選択肢を、現在選択されている都道府県から生成
+        function updateOnsenDropdownOptions() {
+            onsenInput.innerHTML = '<option value="" disabled selected>選択してください</option>';
+            onsenInput.innerHTML += '<option value="その他">その他</option>';
+            
+            if (selectedPrefs.length === 0) {
+                return;
+            }
+            
+            const filtered = ONSEN_DATA.filter(item => selectedPrefs.includes(item.prefecture));
+            filtered.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.spa;
+                option.textContent = item.spa + ` (${item.prefecture})`;
+                onsenInput.appendChild(option);
+            });
+        }
+
+        // 選択された都道府県バッジの表示
+        function renderPrefBadges() {
+            const container = document.getElementById('selected-prefs-container');
+            container.innerHTML = '';
+            selectedPrefs.forEach(pref => {
+                const badge = document.createElement('span');
+                badge.className = 'bg-blue-100 text-blue-800 text-xs px-2.5 py-1 rounded-full flex items-center gap-1 font-medium';
+                badge.innerHTML = `
+                    ${pref}
+                    <button type="button" class="text-blue-500 hover:text-blue-700 font-bold ml-1 focus:outline-none" onclick="removePref('${pref}')">&times;</button>
+                `;
+                container.appendChild(badge);
+            });
+        }
+
+        // 都道府県バッジの削除
+        window.removePref = function(pref) {
+            selectedPrefs = selectedPrefs.filter(p => p !== pref);
+            renderPrefBadges();
+            
+            // 紐づく温泉バッジも自動削除
+            const prefOnsens = ONSEN_DATA.filter(item => item.prefecture === pref).map(item => item.spa);
+            selectedOnsens = selectedOnsens.filter(o => !prefOnsens.includes(o));
+            renderOnsenBadges();
+            
+            updateOnsenDropdownOptions();
+            updateMapColor(); // 地図の選択状態同期
+        }
+
+        // 選択された温泉バッジの表示
+        function renderOnsenBadges() {
+            const container = document.getElementById('selected-onsens-container');
+            container.innerHTML = '';
+            selectedOnsens.forEach(onsen => {
+                const badge = document.createElement('span');
+                badge.className = 'bg-red-100 text-red-800 text-xs px-2.5 py-1 rounded-full flex items-center gap-1 font-medium';
+                badge.innerHTML = `
+                    ${onsen}
+                    <button type="button" class="text-red-500 hover:text-red-700 font-bold ml-1 focus:outline-none" onclick="removeOnsen('${onsen}')">&times;</button>
+                `;
+                container.appendChild(badge);
+            });
+        }
+
+        // 温泉バッジの削除
+        window.removeOnsen = function(onsen) {
+            selectedOnsens = selectedOnsens.filter(o => o !== onsen);
+            renderOnsenBadges();
+        }
+
+        // 古い関数との互換性用
+        function updateOnsenOptions(prefName, selectedValue = '') {
+            updateOnsenOptionsMulti(selectedValue);
+        }
+        function updateOnsenOptionsMulti(selectedValues = []) {
+            // バッジ形式になったため未使用
+        }
+
+        // イベントリスナーのセットアップ
+        function setupEventListeners() {
+            // フローティング＋ボタン押下時にフォームダイアログを開く
+            openFormBtn.addEventListener('click', () => {
+                resetForm();
+                if (currentPrefFilter !== 'すべて') {
+                    selectedPrefs = [currentPrefFilter];
+                    renderPrefBadges();
+                    updateOnsenDropdownOptions();
+                }
+                formDialog.classList.remove('hidden');
+                updateMapColor(); // 開いた時の地図同期
+            });
+
+            // フォームダイアログを閉じるボタン
+            closeFormBtn.addEventListener('click', () => {
+                formDialog.classList.add('hidden');
+                updateMapColor(); // 閉じた時の地図同期
+            });
+
+            // ダイアログ外クリックで閉じる挙動
+            formDialog.addEventListener('click', (e) => {
+                if (e.target === formDialog) {
+                    formDialog.classList.add('hidden');
+                    updateMapColor(); // 閉じた時の地図同期
+                }
+            });
+
+            // フォーム送信（登録/更新）
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const title = titleInput.value.trim();
+                const year = yearSelect.value;
+                const month = monthSelect.value;
+                const day = daySelect.value;
+                const url = urlInput ? urlInput.value.trim() : ''; // URL
+
+                // 選択されているラジオボタンの取得
+                const selectedRadio = document.querySelector('input[name="visit-type"]:checked');
+                const types = selectedRadio ? [selectedRadio.value] : [];
+
+                if (selectedPrefs.length === 0) {
+                    showToast('都道府県を1つ以上選択してください');
+                    return;
+                }
+
+                if (types.length === 0) {
+                    showToast('種別を1つ選択してください');
+                    return;
+                }
+
+                // 日付の入力チェック
+                if (year || month || day) {
+                    if (!year) {
+                        showToast('年を選択してください');
+                        return;
+                    }
+                    if (day && !month) {
+                        showToast('月を選択してください');
+                        return;
+                    }
+
+                    if (year && month && day) {
+                        const y = parseInt(year, 10);
+                        const m = parseInt(month, 10);
+                        const d = parseInt(day, 10);
+                        const testDate = new Date(y, m - 1, d);
+                        if (testDate.getFullYear() !== y || testDate.getMonth() !== m - 1 || testDate.getDate() !== d) {
+                            showToast('正しい日付を入力してください');
+                            return;
+                        }
+                    }
+
+                    const now = new Date();
+                    const currentY = now.getFullYear();
+                    const currentM = now.getMonth() + 1;
+                    const currentD = now.getDate();
+                    const y = parseInt(year, 10);
+
+                    if (y > currentY) {
+                        showToast('未来の日付は登録できません');
+                        return;
+                    }
+                    if (month) {
+                        const m = parseInt(month, 10);
+                        if (y === currentY && m > currentM) {
+                            showToast('未来の日付は登録できません');
+                            return;
+                        }
+                        if (day) {
+                            const d = parseInt(day, 10);
+                            if (y === currentY && m === currentM && d > currentD) {
+                                showToast('未来の日付は登録できません');
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                const newRecord = {
+                    id: editingRecordId || 'record-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                    title,
+                    prefs: selectedPrefs,
+                    types,
+                    year,
+                    month,
+                    day,
+                    onsens: selectedOnsens,
+                    memo: memoInput.value.trim(),
+                    url, // URLの追加
+                    date: new Date().toISOString()
+                };
+
+                // 今回初めて到達した都道府県があるか判定
+                const newlyVisitedPrefs = selectedPrefs.filter(p => {
+                    return !travelRecords.some(r => r.id !== newRecord.id && r.prefs && r.prefs.includes(p));
+                });
+
+                if (editingRecordId) {
+                    const idx = travelRecords.findIndex(r => r.id === editingRecordId);
+                    if (idx !== -1) {
+                        travelRecords[idx] = newRecord;
+                    }
+                } else {
+                    travelRecords.push(newRecord);
+                }
+
+                saveData();
+
+                // 登録時は強制的にフィルターを「すべて」に戻す
+                if (prefFilterSelect) {
+                    prefFilterSelect.value = 'すべて';
+                    currentPrefFilter = 'すべて';
+                }
+                setFilter('すべて');
+                
+                showToast(`旅行「${title}」の記録を登録しました`);
+                
+                if (newlyVisitedPrefs.length > 0) {
+                    checkMilestones();
+                }
+
+                resetForm();
+                formDialog.classList.add('hidden'); // 登録完了後にダイアログを閉じる
+            });
+
+            // 削除ボタン (単一データ削除)
+            deleteBtn.addEventListener('click', async () => {
+                if (!editingRecordId) return;
+                const record = travelRecords.find(r => r.id === editingRecordId);
+                if (!record) return;
+
+                const confirmed = await showCustomConfirm('確認', `旅行「${record.title}」の記録を削除しますか？`);
+                if (confirmed) {
+                    travelRecords = travelRecords.filter(r => r.id !== editingRecordId);
+                    saveData();
+                    updateAllViews();
+                    showToast(`削除しました`);
+                    resetForm();
+                    formDialog.classList.add('hidden'); // 削除完了後にダイアログを閉じる
+                }
+            });
+
+            // 都道府県フィルター変更時
+            prefFilterSelect.addEventListener('change', (e) => {
+                currentPrefFilter = e.target.value;
+                updateAllViews();
+            });
+
+            // 種別フィルター変更時
+            typeFilterSelect.addEventListener('change', (e) => {
+                setFilter(e.target.value);
+            });
+
+            // 設定アイコン
+            settingBtn.addEventListener('click', () => {
+                settingsDialog.classList.remove('hidden');
+            });
+
+            // エクスポートボタン
+            exportBtn.addEventListener('click', () => {
+                exportCSV();
+            });
+
+            // すべてのデータを削除するボタン (全データ削除、2回確認)
+            bulkDeleteBtn.addEventListener('click', async () => {
+                const firstConfirm = await showCustomConfirm("【警告】", "これまでに保存したすべての登録内容を完全に削除します。\nよろしいですか？");
+                
+                if (firstConfirm) {
+                    const secondConfirm = await showCustomConfirm("【確認】", "この操作を行うとすべてのデータが削除され、初期状態に戻ります。\n\n元に戻すことはできません。\n本当に削除しますか？");
+                    
+                    if (secondConfirm) {
+                        travelRecords = []; // 状態を初期化
+                        visitedData = {};
+                        achievedMilestones = {
+                            percent: [],
+                            count: [],
+                            soloPercent: [],
+                            friendsPercent: [],
+                            otherPercent: [],
+                            onsenPercent: []
+                        };
+                        localStorage.setItem('achievedMilestones', JSON.stringify(achievedMilestones));
+                        saveData(); // ローカルストレージを更新
+                        setFilter('すべて'); // フィルターをすべてに戻す
+                        if (prefFilterSelect) {
+                            prefFilterSelect.value = 'すべて';
+                            currentPrefFilter = 'すべて';
+                        }
+                        updateAllViews(); // 画面を再描画
+                        resetForm(); // フォームをクリア
+                        showToast("すべてのデータを削除しました");
+                    }
+                }
+            });
+
+            // 設定ダイアログ閉じるボタン
+            settingsDialogCloseBtn.addEventListener('click', () => {
+                settingsDialog.classList.add('hidden');
+            });
+        }
+
+        // 達成判定機能
+        async function checkMilestones() {
+            rebuildVisitedData();
+            const count = Object.keys(visitedData).filter(pref => visitedData[pref] && visitedData[pref].length > 0).length;
+            const percent = Math.floor((count / 47) * 100);
+
+            let message = "";
+            let triggered = false;
+
+            // 登録件数判定 (10, 20, 30, 40, 47)
+            const targetCounts = [10, 20, 30, 40, 47];
+            if (targetCounts.includes(count) && !achievedMilestones.count.includes(count)) {
+                message = `登録数 ${count} 件を達成しました！`;
+                achievedMilestones.count.push(count);
+                triggered = true;
+            }
+
+            // 進捗率判定 (10%刻み)
+            const targetPercents = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+            const currentFloorPercent = Math.floor(percent / 10) * 10;
+            if (currentFloorPercent > 0 && targetPercents.includes(currentFloorPercent) && !achievedMilestones.percent.includes(currentFloorPercent)) {
+                if (message) message += "\n";
+                message += `制覇率 ${currentFloorPercent}% を達成しました！`;
+                achievedMilestones.percent.push(currentFloorPercent);
+                triggered = true;
+            }
+
+            // 「旅行(独り)」の進捗率判定
+            const soloCount = Object.keys(visitedData).filter(pref => {
+                const arr = visitedData[pref];
+                return arr && arr.some(data => data.types && data.types.includes('旅行(独り)'));
+            }).length;
+            const soloPercent = Math.floor((soloCount / 47) * 100);
+            const currentSoloFloorPercent = Math.floor(soloPercent / 10) * 10;
+            if (currentSoloFloorPercent > 0 && targetPercents.includes(currentSoloFloorPercent) && !achievedMilestones.soloPercent.includes(currentSoloFloorPercent)) {
+                if (message) message += "\n";
+                message += `「独り旅」の制覇率 ${currentSoloFloorPercent}% を達成しました！`;
+                achievedMilestones.soloPercent.push(currentSoloFloorPercent);
+                triggered = true;
+            }
+
+            // 「旅行(友人)」の進捗率判定
+            const friendsCount = Object.keys(visitedData).filter(pref => {
+                const arr = visitedData[pref];
+                return arr && arr.some(data => data.types && data.types.includes('旅行(友人)'));
+            }).length;
+            const friendsPercent = Math.floor((friendsCount / 47) * 100);
+            const currentFriendsFloorPercent = Math.floor(friendsPercent / 10) * 10;
+            if (currentFriendsFloorPercent > 0 && targetPercents.includes(currentFriendsFloorPercent) && !achievedMilestones.friendsPercent.includes(currentFriendsFloorPercent)) {
+                if (message) message += "\n";
+                message += `「友人旅」の制覇率 ${currentFriendsFloorPercent}% を達成しました！`;
+                achievedMilestones.friendsPercent.push(currentFriendsFloorPercent);
+                triggered = true;
+            }
+
+            // 「その他」の進捗率判定
+            const otherCount = Object.keys(visitedData).filter(pref => {
+                const arr = visitedData[pref];
+                return arr && arr.some(data => data.types && data.types.includes('その他'));
+            }).length;
+            const otherPercent = Math.floor((otherCount / 47) * 100);
+            const currentOtherFloorPercent = Math.floor(otherPercent / 10) * 10;
+            if (currentOtherFloorPercent > 0 && targetPercents.includes(currentOtherFloorPercent) && !achievedMilestones.otherPercent.includes(currentOtherFloorPercent)) {
+                if (message) message += "\n";
+                message += `「その他旅行」の制覇率 ${currentOtherFloorPercent}% を達成しました！`;
+                achievedMilestones.otherPercent.push(currentOtherFloorPercent);
+                triggered = true;
+            }
+
+            // 温泉の進捗率判定
+            const onsenCount = Object.keys(visitedData).filter(pref => {
+                const arr = visitedData[pref];
+                return arr && arr.some(data => data.onsen && data.onsen.trim() !== '');
+            }).length;
+            const onsenPercent = Math.floor((onsenCount / 47) * 100);
+            const currentOnsenFloorPercent = Math.floor(onsenPercent / 10) * 10;
+            if (currentOnsenFloorPercent > 0 && targetPercents.includes(currentOnsenFloorPercent) && !achievedMilestones.onsenPercent.includes(currentOnsenFloorPercent)) {
+                if (message) message += "\n";
+                message += `「温泉」の制覇率 ${currentOnsenFloorPercent}% を達成しました！`;
+                achievedMilestones.onsenPercent.push(currentOnsenFloorPercent);
+                triggered = true;
+            }
+
+            if (triggered) {
+                if (percent === 100 && count === 47) {
+                    message += "\n\n全都道府県をコンプリートしました！🎉";
+                }
+                localStorage.setItem('achievedMilestones', JSON.stringify(achievedMilestones));
+                await showCustomAlert("実績獲得！", message);
+            }
+        }
+
+        // フィルターを設定してUIを更新する
+        function setFilter(filterValue) {
+            currentFilter = filterValue;
+            
+            if (typeFilterSelect) {
+                typeFilterSelect.value = filterValue;
+            }
+
+            // 全体のビューを更新
+            updateAllViews();
+        }
+
+        // 地図・リスト・統計をまとめて更新
+        function updateAllViews() {
+            rebuildVisitedData();
+            updateMapColor();
+            updateList();
+            updateStats();
+        }
+
+        // データをLocalStorageに保存
+        function saveData() {
+            localStorage.setItem('japanTravelRecords', JSON.stringify(travelRecords));
+        }
+
+        // フォームのリセット
+        function resetForm() {
+            selectedPrefs = [];
+            selectedOnsens = [];
+            renderPrefBadges();
+            renderOnsenBadges();
+            updateOnsenDropdownOptions();
+
+            prefSelect.value = '';
+            if (titleInput) titleInput.value = '';
+            if (yearSelect) yearSelect.value = '';
+            if (monthSelect) monthSelect.value = '';
+            if (daySelect) daySelect.value = '';
+            if (urlInput) urlInput.value = ''; // URLクリア
+            
+            document.querySelectorAll('input[name="visit-type"]').forEach(rb => {
+                rb.checked = false;
+            });
+            memoInput.value = '';
+            submitBtn.innerHTML = '<i class="fa-solid fa-check mr-2"></i>登録する';
+            deleteBtn.classList.add('hidden');
+            prefSelect.disabled = false;
+            
+            editingPref = null;
+            editingIndex = null;
+            editingRecordId = null;
+
+            if (formDialog && formDialog.firstElementChild) {
+                formDialog.firstElementChild.scrollTop = 0;
+            }
+            updateMapColor();
+        }
+
+        // 既存データをフォームに読み込む (旅行タイトルベース)
+        function loadDataToForm(prefName, recordId = null) {
+            let targetRecord = null;
+            if (recordId !== null && isNaN(recordId)) {
+                targetRecord = travelRecords.find(r => r.id === recordId);
+            } else if (prefName !== null && recordId !== null && !isNaN(recordId)) {
+                const filtered = getFilteredRecords();
+                const item = filtered.find(f => f.pref === prefName && f.index === recordId);
+                if (item && item.recordId) {
+                    targetRecord = travelRecords.find(r => r.id === item.recordId);
+                }
+            } else if (prefName && recordId === null) {
+                resetForm();
+                selectedPrefs = [prefName];
+                renderPrefBadges();
+                updateOnsenDropdownOptions();
+                editingPref = prefName;
+                editingRecordId = null;
+                updateMapColor(); // 地図とのリアルタイム同期
+                return;
+            }
+
+            if (targetRecord) {
+                editingRecordId = targetRecord.id;
+
+                // 都道府県
+                selectedPrefs = targetRecord.prefs ? [...targetRecord.prefs] : [];
+                renderPrefBadges();
+
+                // 温泉
+                selectedOnsens = targetRecord.onsens ? [...targetRecord.onsens] : [];
+                renderOnsenBadges();
+                updateOnsenDropdownOptions();
+
+                if (titleInput) titleInput.value = targetRecord.title || '';
+                if (yearSelect) yearSelect.value = targetRecord.year || '';
+                if (monthSelect) monthSelect.value = targetRecord.month || '';
+                if (daySelect) daySelect.value = targetRecord.day || '';
+                if (urlInput) urlInput.value = targetRecord.url || ''; // URLのロード
+
+                const types = targetRecord.types || [];
+                document.querySelectorAll('input[name="visit-type"]').forEach(rb => {
+                    rb.checked = types.includes(rb.value);
+                });
+                
+                memoInput.value = targetRecord.memo || '';
+                submitBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate mr-2"></i>更新する';
+                deleteBtn.classList.remove('hidden');
+                updateMapColor(); // 地図とのリアルタイム同期
+            } else {
+                resetForm();
+                editingRecordId = null;
+                updateMapColor(); // 地図とのリアルタイム同期
+            }
+
+            if (formDialog && formDialog.firstElementChild) {
+                formDialog.firstElementChild.scrollTop = 0;
+            }
+        }
+
+        // フィルタリングされた旅行タイトルベースのレコード群を取得
+        function getFilteredRecords() {
+            const records = [];
+            travelRecords.forEach(record => {
+                if (currentPrefFilter !== 'すべて' && !(record.prefs && record.prefs.includes(currentPrefFilter))) {
+                    return;
+                }
+
+                let matchesType = false;
+                const types = record.types || [];
+                if (currentFilter === 'すべて') {
+                    matchesType = true;
+                } else if (currentFilter === '温泉') {
+                    matchesType = record.onsens && record.onsens.length > 0;
+                } else {
+                    matchesType = types.includes(currentFilter);
+                }
+
+                if (matchesType) {
+                    records.push({
+                        recordId: record.id,
+                        pref: (record.prefs || []).join('、'),
+                        prefs: record.prefs || [],
+                        index: record.id,
+                        data: {
+                            title: record.title,
+                            year: record.year,
+                            month: record.month,
+                            day: record.day,
+                            types: record.types,
+                            onsen: (record.onsens || []).join('、'),
+                            onsens: record.onsens || [],
+                            memo: record.memo,
+                            url: record.url || '', // URLの格納
+                            date: record.date
+                        }
+                    });
+                }
+            });
+            return records;
+        }
+
+        // リストの描画
+        function updateList() {
+            const items = listContainer.querySelectorAll('.record-item');
+            items.forEach(item => item.remove());
+
+            const filteredRecords = getFilteredRecords();
+            
+            if (filteredRecords.length === 0) {
+                emptyState.style.display = 'block';
+                if (currentFilter === 'すべて' && currentPrefFilter === 'すべて') {
+                    emptyState.innerHTML = 'まだ登録された県はありません。';
+                } else {
+                    let filterMsg = '';
+                    if (currentPrefFilter !== 'すべて') filterMsg += `${currentPrefFilter}`;
+                    if (currentFilter !== 'すべて') {
+                        if (filterMsg) filterMsg += '・';
+                        filterMsg += `${currentFilter}`;
+                    }
+                    emptyState.innerHTML = `「${filterMsg}」の記録はありません。`;
+                }
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+
+            filteredRecords.sort((a, b) => {
+                const dataA = a.data;
+                const dataB = b.data;
+
+                const yearA = dataA.year ? String(dataA.year).padStart(4, '0') : '0000';
+                const monthA = dataA.month ? String(dataA.month).padStart(2, '0') : '00';
+                const dayA = dataA.day ? String(dataA.day).padStart(2, '0') : '00';
+                const dateKeyA = `${yearA}-${monthA}-${dayA}`;
+
+                const yearB = dataB.year ? String(dataB.year).padStart(4, '0') : '0000';
+                const monthB = dataB.month ? String(dataB.month).padStart(2, '0') : '00';
+                const dayB = dataB.day ? String(dataB.day).padStart(2, '0') : '00';
+                const dateKeyB = `${yearB}-${monthB}-${dayB}`;
+
+                if (dateKeyA !== dateKeyB) {
+                    return dateKeyB.localeCompare(dateKeyA);
+                }
+
+                const firstPrefA = a.prefs && a.prefs[0] ? a.prefs[0] : '';
+                const firstPrefB = b.prefs && b.prefs[0] ? b.prefs[0] : '';
+                const indexA = PREFECTURES.indexOf(firstPrefA);
+                const indexB = PREFECTURES.indexOf(firstPrefB);
+                return indexA - indexB;
+            })
+            .forEach(itemData => {
+                const pref = itemData.pref;
+                const data = itemData.data;
+                const types = data.types || [];
+
+                let badgesHtml = '';
+                types.forEach(type => {
+                    const icon = getTypeIcon(type);
+                    const colorClass = getTypeColorClass(type);
+                    const label = type === '旅行(独り)' ? '独り' : type === '旅行(友人)' ? '友人' : '他';
+                    badgesHtml += `
+                        <span class="${colorClass} text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                            <i class="fa-solid ${icon} text-[8px]"></i>${label}
+                        </span>
+                    `;
+                });
+
+                // 都道府県バッジ（色は地図の「すべて（訪問済）」に合わせ、淡い青「#bfdbfe」に設定）を作成
+                let prefBadgesHtml = '';
+                if (itemData.prefs && Array.isArray(itemData.prefs)) {
+                    itemData.prefs.forEach(p => {
+                        prefBadgesHtml += `
+                            <span class="bg-[#bfdbfe] text-[#1e40af] text-[10px] px-2 py-0.5 rounded-full font-medium">
+                                ${p}
+                            </span>
+                        `;
+                    });
+                }
+
+                const dateStr = (data.year || data.month || data.day) 
+                    ? `${data.year ? data.year + '年' : ''}${data.month ? data.month + '月' : ''}${data.day ? data.day + '日' : ''}`
+                    : '';
+                
+                // 温泉バッジ（薄い赤背景、赤文字）を作成
+                let onsenBadgesHtml = '';
+                if (data.onsens && Array.isArray(data.onsens)) {
+                    data.onsens.forEach(o => {
+                        if (o.trim() !== '') {
+                            onsenBadgesHtml += `
+                                <span class="bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded-full font-medium">
+                                    ${o}
+                                </span>
+                            `;
+                        }
+                    });
+                }
+
+                const item = document.createElement('div');
+                item.className = 'record-item bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between cursor-pointer active:bg-gray-50 transition-colors';
+                
+                // URL表示部分（🌏リンク）の組み立て
+                const urlLinkHtml = data.url 
+                    ? `<a href="${data.url}" target="_blank" onclick="event.stopPropagation();" class="text-xs text-blue-500 hover:text-blue-700 underline flex items-center gap-1 font-semibold shrink-0">🌏 URL</a>`
+                    : '';
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-3 overflow-hidden w-full">
+                        <div class="flex flex-col w-full overflow-hidden">
+                            <!-- 1行目：タイトル、種類バッヂ -->
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-gray-800 text-base truncate">${data.title || ''}</span>
+                                <div class="flex gap-1 overflow-x-auto no-scrollbar shrink-0">
+                                    ${badgesHtml}
+                                </div>
+                            </div>
+                            <!-- 2行目：日付、URL (インデント幅を維持) -->
+                            <div class="flex items-center justify-between mt-1 pl-[1em]">
+                                <span class="text-xs text-gray-400 font-medium">${dateStr || '日付未設定'}</span>
+                                ${urlLinkHtml}
+                            </div>
+                            <!-- 3行目：都道府県バッヂ (インデント幅を維持) -->
+                            <div class="flex flex-wrap items-center gap-1.5 mt-1.5 pl-[1em]">
+                                ${prefBadgesHtml}
+                            </div>
+                            <!-- 4行目：温泉バッヂ (温泉が登録されている場合のみ表示。インデント幅を維持) -->
+                            ${onsenBadgesHtml ? `
+                            <div class="flex flex-wrap items-center gap-1.5 mt-1 pl-[1em]">
+                                ${onsenBadgesHtml}
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-gray-300 text-xs ml-3"></i>
+                `;
+                
+                item.addEventListener('click', () => {
+                    loadDataToForm(null, itemData.recordId);
+                    formDialog.classList.remove('hidden');
+                    updateMapColor(); // 地図とのリアルタイム同期を確実に行う
+                });
+
+                listContainer.appendChild(item);
+            });
+        }
+
+        // 統計情報の更新 (制覇した都道府県の重複を除いた実数)
+        function updateStats() {
+            const visitedPrefsSet = new Set();
+            travelRecords.forEach(record => {
+                let matchesType = false;
+                const types = record.types || [];
+                if (currentFilter === 'すべて') {
+                    matchesType = true;
+                } else if (currentFilter === '温泉') {
+                    matchesType = record.onsens && record.onsens.length > 0;
+                } else {
+                    matchesType = types.includes(currentFilter);
+                }
+
+                if (matchesType && record.prefs) {
+                    record.prefs.forEach(pref => {
+                        visitedPrefsSet.add(pref);
+                    });
+                }
+            });
+
+            const allCount = visitedPrefsSet.size;
+            visitedCount.textContent = allCount;
+            const allPercent = Math.floor((allCount / 47) * 100);
+            visitedParcent.textContent = allPercent;
+        }
+
+        // D3.jsによる地図の描画
+        async function renderMap() {
+            const container = document.getElementById('map-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            const projection = d3.geoMercator();
+            const path = d3.geoPath().projection(projection);
+
+            const svg = d3.select('#map-container')
+                .append('svg')
+                .attr('width', '100%')
+                .attr('height', '100%')
+                .attr('viewBox', `0 0 ${width} ${height}`);
+
+            const defs = svg.append('defs');
+            const pattern = defs.append('pattern')
+                .attr('id', 'stripe-pattern')
+                .attr('width', 4)
+                .attr('height', 4)
+                .attr('patternUnits', 'userSpaceOnUse');
+
+            pattern.append('rect')
+                .attr('width', 4)
+                .attr('height', 4)
+                .attr('fill', '#fee2e2');
+
+            pattern.append('path')
+                .attr('d', 'M0,4 L4,0 M-1,1 L1,-1 M3,5 L5,3')
+                .attr('stroke', '#fe7171')
+                .attr('stroke-width', 0.8);
+
+            pattern.append('animateTransform')
+                .attr('attributeName', 'patternTransform')
+                .attr('type', 'translate')
+                .attr('from', '0,0')
+                .attr('to', '4,0')
+                .attr('dur', '1s')
+                .attr('repeatCount', 'indefinite');
+
+            const g = svg.append('g');
+            g.attr('transform', 'translate(-75.83913875405563,-5.374760224344328) scale(1.29683954962801)');
+
+            const zoom = d3.zoom()
+                .scaleExtent([1, 8])
+                .translateExtent([[0, 0], [width, height]])
+                .on('zoom', (event) => {
+                    g.attr('transform', event.transform);
+                });
+
+            svg.call(zoom);
+
+            svg.on('click', (event) => {
+                if (event.defaultPrevented) return;
+                currentPrefFilter = 'すべて';
+                if (prefFilterSelect) {
+                    prefFilterSelect.value = 'すべて';
+                }
+                updateAllViews();
+            });
+
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson');
+                if (!response.ok) throw new Error('Network response was not ok');
+                const geoJson = await response.json();
+
+                const padding = 20;
+                projection.fitExtent([[padding, padding], [width - padding, height - padding]], geoJson);
+
+                const getPrefName = (properties) => properties.nam_ja || properties.name || properties.nam;
+
+                d3PathElements = g.selectAll('.pref-path')
+                    .data(geoJson.features)
+                    .enter()
+                    .append('path')
+                    .attr('class', 'pref-path')
+                    .attr('d', path)
+                    .attr('data-pref', d => getPrefName(d.properties))
+                    .on('click', handleMapClick);
+
+                updateMapColor();
+                document.getElementById('loading').classList.add('hidden');
+
+            } catch (error) {
+                console.error("地図の読み込みに失敗:", error);
+                document.getElementById('loading').innerHTML = `
+                    <i class="fa-solid fa-circle-exclamation text-3xl text-red-400 mb-2"></i>
+                    <span class="text-sm text-gray-600">地図データが取得できませんでした</span>
+                `;
+            }
+        }
+
+        // 地図の色をフィルター状態に基づいて更新
+        function updateMapColor() {
+            if (!d3PathElements) return;
+
+            // フォームが表示中かどうか
+            const isFormOpen = formDialog && !formDialog.classList.contains('hidden');
+            const checkedPrefs = isFormOpen ? selectedPrefs : [];
+
+            d3PathElements.attr('fill', function() {
+                const element = d3.select(this);
+                const pref = element.attr('data-pref');
+
+                const isSelected = isFormOpen 
+                    ? checkedPrefs.includes(pref)
+                    : (currentPrefFilter !== 'すべて' && pref === currentPrefFilter);
+
+                if (isSelected) {
+                    return 'url(#stripe-pattern)';
+                }
+
+                const arr = visitedData[pref];
+
+                if (arr && arr.length > 0) {
+                    if (currentFilter === 'すべて') {
+                        return FILL_COLORS['すべて'];
+                    } else {
+                        const hasMatchingType = arr.some(data => {
+                            if (currentFilter === '温泉') {
+                                return data.onsens && data.onsens.length > 0;
+                            }
+                            return data.types && data.types.includes(currentFilter);
+                        });
+                        if (hasMatchingType) {
+                            return FILL_COLORS[currentFilter] || DEFAULT_COLOR;
+                        }
+                    }
+                }
+                return DEFAULT_COLOR;
+            })
+            .attr('stroke', function(d) {
+                const element = d3.select(this);
+                const pref = element.attr('data-pref');
+
+                const isSelected = isFormOpen 
+                    ? checkedPrefs.includes(pref)
+                    : (currentPrefFilter !== 'すべて' && pref === currentPrefFilter);
+
+                if (isSelected) {
+                    element.raise();
+                    return '#ff0000'; // 赤
+                }
+
+                const arr = visitedData[pref];
+
+                if (arr && arr.length > 0) {
+                    if (currentFilter === 'すべて') {
+                        element.raise();
+                        return STROKE_COLORS['すべて'];
+                    } else {
+                        const hasMatchingType = arr.some(data => {
+                            if (currentFilter === '温泉') {
+                                return data.onsens && data.onsens.length > 0;
+                            }
+                            return data.types && data.types.includes(currentFilter);
+                        });
+                        if (hasMatchingType) {
+                            element.raise();
+                            return STROKE_COLORS[currentFilter] || DEFAULT_STROKE;
+                        }
+                    }
+                }
+
+                element.lower();
+                return DEFAULT_STROKE;
+            })
+            .attr('stroke-width', function() {
+                const element = d3.select(this);
+                const pref = element.attr('data-pref');
+
+                const isSelected = isFormOpen 
+                    ? checkedPrefs.includes(pref)
+                    : (currentPrefFilter !== 'すべて' && pref === currentPrefFilter);
+
+                if (isSelected) {
+                    return '1.5px';
+                }
+                return null;
+            });
+        }
+
+        // 地図をタップした時の処理
+        function handleMapClick(event, d) {
+            const prefName = d.properties.nam_ja || d.properties.name || d.properties.nam;
+            
+            if (PREFECTURES.includes(prefName)) {
+                event.stopPropagation();
+
+                currentPrefFilter = prefName;
+                if (prefFilterSelect) {
+                    prefFilterSelect.value = prefName;
+                }
+                updateAllViews();
+            }
+        }
+
+        // アイコンとカラーのヘルパー関数
+        function getTypeIcon(type) {
+            switch(type) {
+                case '旅行(独り)': return 'fa-user';
+                case '旅行(友人)': return 'fa-user-group';
+                case 'その他': return 'fa-location-dot';
+                default: return 'fa-map-pin';
+            }
+        }
+
+        // ゲッターカラークラス
+        function getTypeColorClass(type) {
+            switch(type) {
+                case '旅行(独り)': return 'bg-emerald-500';
+                case '旅行(友人)': return 'bg-purple-500';
+                case 'その他': return 'bg-gray-400';
+                case '温泉': return 'bg-yellow-500';
+                default: return 'bg-gray-500';
+            }
+        }
+
+        // トースト通知を表示
+        let toastTimeout;
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+            
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+            }, 2000);
+        }
+
+        // CSVエクスポート
+        function exportCSV() {
+            let csv = 'タイトル,都道府県,種別,年,月,日,温泉,備考\n';
+            travelRecords.forEach(record => {
+                const prefsStr = (record.prefs || []).join(';');
+                const typesStr = (record.types || []).join(';');
+                const onsensStr = (record.onsens || []).join(';');
+                const titleEscaped = (record.title || '').replace(/"/g, '""');
+                const memoEscaped = (record.memo || '').replace(/"/g, '""');
+                csv += `"${titleEscaped}","${prefsStr}","${typesStr}","${record.year || ''}","${record.month || ''}","${record.day || ''}","${onsensStr}","${memoEscaped}"\n`;
+            });
+            const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'travel_data.csv';
+            a.click();
+        }
+
+        // CSVインポート
+        function importCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const rows = e.target.result.split('\n').slice(1);
+                const newRecords = [];
+                rows.forEach(row => {
+                    const cols = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    if (cols.length >= 2) {
+                        const title = cols[0] ? cols[0].replace(/"/g, '').trim() : '';
+                        if (!title) return;
+                        
+                        const prefs = cols[1] ? cols[1].replace(/"/g, '').split(';').filter(Boolean) : [];
+                        const types = cols[2] ? cols[2].replace(/"/g, '').split(';').filter(Boolean) : [];
+                        const year = cols[3] ? cols[3].replace(/"/g, '') : '';
+                        const month = cols[4] ? cols[4].replace(/"/g, '') : '';
+                        const day = cols[5] ? cols[5].replace(/"/g, '') : '';
+                        const onsens = cols[6] ? cols[6].replace(/"/g, '').split(';').filter(Boolean) : [];
+                        const memo = cols[7] ? cols[7].replace(/"/g, '') : '';
+
+                        newRecords.push({
+                            id: 'record-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                            title,
+                            prefs,
+                            types,
+                            year,
+                            month,
+                            day,
+                            onsens,
+                            memo,
+                            date: new Date().toISOString()
+                        });
+                    }
+                });
+                travelRecords = newRecords;
+                localStorage.setItem('japanTravelRecords', JSON.stringify(travelRecords));
+                await showCustomAlert('完了', 'データをインポートしました');
+                location.reload();
+            };
+            reader.readAsText(file);
+        }
+
+        // カスタム確認ダイアログ用Promise関数
+        function showCustomConfirm(title, message) {
+            return new Promise((resolve) => {
+                const dialog = document.getElementById('custom-dialog');
+                const titleEl = document.getElementById('custom-dialog-title');
+                const messageEl = document.getElementById('custom-dialog-message');
+                const cancelBtn = document.getElementById('custom-dialog-cancel');
+                const okBtn = document.getElementById('custom-dialog-ok');
+
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+                cancelBtn.classList.remove('hidden');
+                dialog.classList.remove('hidden');
+
+                const handleCancel = () => {
+                    cleanup();
+                    resolve(false);
+                };
+
+                const handleOk = () => {
+                    cleanup();
+                    resolve(true);
+                };
+
+                const cleanup = () => {
+                    dialog.classList.add('hidden');
+                    cancelBtn.removeEventListener('click', handleCancel);
+                    okBtn.removeEventListener('click', handleOk);
+                };
+
+                cancelBtn.addEventListener('click', handleCancel);
+                okBtn.addEventListener('click', handleOk);
+            });
+        }
+
+        // カスタムアラートダイアログ用Promise関数
+        function showCustomAlert(title, message) {
+            return new Promise((resolve) => {
+                const dialog = document.getElementById('custom-dialog');
+                const titleEl = document.getElementById('custom-dialog-title');
+                const messageEl = document.getElementById('custom-dialog-message');
+                const cancelBtn = document.getElementById('custom-dialog-cancel');
+                const okBtn = document.getElementById('custom-dialog-ok');
+
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+                cancelBtn.classList.add('hidden');
+                dialog.classList.remove('hidden');
+
+                const handleOk = () => {
+                    dialog.classList.add('hidden');
+                    okBtn.removeEventListener('click', handleOk);
+                    resolve();
+                };
+
+                okBtn.addEventListener('click', handleOk);
+            });
+        }
+
+        // アプリ起動
+        document.addEventListener('DOMContentLoaded', init);
+
+        // window.onload時のスプラッシュ画面制御
+        window.onload = function() {
+            // バージョン情報の表示
+            const versionEl = document.getElementById('splash-version');
+            if (versionEl) {
+                versionEl.textContent = APP_VERSION;
+            }
+            setTimeout(() => {
+                const splash = document.getElementById('splash-screen');
+                if (splash) {
+                    splash.classList.add('opacity-0');
+                    setTimeout(() => {
+                        splash.classList.add('hidden');
+                    }, 500);
+                }
+            }, 4500);
+        };
+    </script>
+</body>
+</html>
