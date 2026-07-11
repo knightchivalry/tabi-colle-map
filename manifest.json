@@ -1,8 +1,9 @@
 {
   "name": "旅コレMAP",
   "short_name": "旅コレMAP",
-  "start_url": "/index.html",
+  "start_url": "/tabi-colle-map/index.html",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#000000",
   "icons": [
