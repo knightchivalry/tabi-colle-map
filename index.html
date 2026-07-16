@@ -251,7 +251,7 @@
                         <textarea id="memo-input" rows="2" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-sm" placeholder="訪れた場所や思い出など"></textarea>
                     </div>
 
-                    <!-- ボタン (修正内容1、変更:削除をごみ箱のみにして左、✕をキャンセルボタンにして一番右へ) -->
+                    <!-- ボタン -->
                     <div class="pt-2 flex gap-2">
                         <button type="button" id="delete-btn" class="hidden bg-gray-100 hover:bg-red-50 text-red-500 font-bold py-3 px-4 rounded-xl border border-gray-200 transition-colors">
                             <i class="fa-regular fa-trash-can text-lg"></i>
@@ -1248,6 +1248,8 @@
           { "prefecture": "和歌山県", "spa": "紀伊見温泉" },
           { "prefecture": "和歌山県", "spa": "美里温泉" },
           { "prefecture": "和歌山県", "spa": "しみず温泉" },
+          { "prefecture": "和歌山県", "spa": "滝原温泉" },
+          { "prefecture": "和歌山県", "spa": "湯浅温泉" },
           { "prefecture": "和歌山県", "spa": "紀州みなべ千里浜温泉" },
           { "prefecture": "和歌山県", "spa": "夏山温泉" },
           { "prefecture": "和歌山県", "spa": "南紀月野瀬温泉" },
@@ -1341,7 +1343,7 @@
           { "prefecture": "岡山県", "spa": "岡山空港温泉" },
           { "prefecture": "岡山県", "spa": "小森温泉" },
           { "prefecture": "岡山県", "spa": "八幡温泉郷" },
-          { "prefecture": "岡山県", "spa": "基本温泉" },
+          { "prefecture": "岡山県", "spa": "粟井温泉" },
           { "prefecture": "岡山県", "spa": "怒塚山温泉" },
           { "prefecture": "岡山県", "spa": "和気鵜飼谷温泉" },
           { "prefecture": "岡山県", "spa": "たまの温泉" },
@@ -1470,7 +1472,7 @@
           { "prefecture": "大分県", "spa": "日出温泉" },
           { "prefecture": "大分県", "spa": "九酔渓温泉" },
           { "prefecture": "大分県", "spa": "久住赤川温泉" },
-          { "prefecture": "大分県", "spa": "兵頭温泉" },
+          { "prefecture": "大分県", "spa": "杵築温泉" },
           { "prefecture": "大分県", "spa": "柴石温泉" },
           { "prefecture": "大分県", "spa": "長者原温泉" },
           { "prefecture": "大分県", "spa": "山香温泉" },
@@ -1765,7 +1767,7 @@
                     updateOnsenDropdownOptions();
                     updateMapColor(); // 地図の選択状態同期
                 }
-                e.target.value = ''; // 選択リreset
+                e.target.value = ''; // 選択リセット
             });
 
             // 温泉セレクトボックスの変更イベント
@@ -1825,7 +1827,7 @@
             updateMapColor(); // 地図の選択状態同期
         }
 
-        // 選択された温泉バッジ of 表示
+        // 選択された温泉バッジの表示
         function renderOnsenBadges() {
             const container = document.getElementById('selected-onsens-container');
             container.innerHTML = '';
@@ -1866,7 +1868,7 @@
                 }
                 formDialog.classList.remove('hidden');
                 updateMapColor(); // 開いた時の地図同期
-                // 表示された後にスクロール位置を最上部に固定する (修正内容2)
+                // 表示された後にスクロール位置を最上部に固定する
                 if (formDialog && formDialog.firstElementChild) {
                     setTimeout(() => {
                         formDialog.firstElementChild.scrollTop = 0;
