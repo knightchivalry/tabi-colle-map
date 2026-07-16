@@ -1236,7 +1236,6 @@
           { "prefecture": "和歌山県", "spa": "南紀勝浦温泉" },
           { "prefecture": "和歌山県", "spa": "湯の峰温泉" },
           { "prefecture": "和歌山県", "spa": "川湯温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "和歌山県", "spa": "南紀湯川温泉" },
           { "prefecture": "和歌山県", "spa": "椿温泉" },
           { "prefecture": "和歌山県", "spa": "すさみ温泉" },
@@ -1248,16 +1247,13 @@
           { "prefecture": "和歌山県", "spa": "花山温泉" },
           { "prefecture": "和歌山県", "spa": "紀伊見温泉" },
           { "prefecture": "和歌山県", "spa": "美里温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "和歌山県", "spa": "しみず温泉" },
           { "prefecture": "和歌山県", "spa": "紀州みなべ千里浜温泉" },
           { "prefecture": "和歌山県", "spa": "夏山温泉" },
           { "prefecture": "和歌山県", "spa": "南紀月野瀬温泉" },
           { "prefecture": "和歌山県", "spa": "湯ノ谷温泉" },
           { "prefecture": "和歌山県", "spa": "日置川温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "和歌山県", "spa": "雲取温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "和歌山県", "spa": "熊野川温泉" },
           { "prefecture": "和歌山県", "spa": "その他" },
           { "prefecture": "大阪府", "spa": "犬鳴山温泉" },
@@ -1290,7 +1286,6 @@
           { "prefecture": "兵庫県", "spa": "神戸みなと温泉" },
           { "prefecture": "兵庫県", "spa": "東条温泉" },
           { "prefecture": "兵庫県", "spa": "加古川温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "兵庫県", "spa": "やしろ夢園温泉" },
           { "prefecture": "兵庫県", "spa": "波賀温泉" },
           { "prefecture": "兵庫県", "spa": "生谷温泉" },
@@ -1348,7 +1343,6 @@
           { "prefecture": "岡山県", "spa": "八幡温泉郷" },
           { "prefecture": "岡山県", "spa": "基本温泉" },
           { "prefecture": "岡山県", "spa": "怒塚山温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "岡山県", "spa": "和気鵜飼谷温泉" },
           { "prefecture": "岡山県", "spa": "たまの温泉" },
           { "prefecture": "岡山県", "spa": "鷲羽山吹上温泉" },
@@ -1363,7 +1357,6 @@
           { "prefecture": "岡山県", "spa": "その他" },
           { "prefecture": "広島県", "spa": "女鹿平温泉" },
           { "prefecture": "広島県", "spa": "湯来温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "広島県", "spa": "宮浜温泉" },
           { "prefecture": "広島県", "spa": "湯の山温泉" },
           { "prefecture": "広島県", "spa": "君田温泉" },
@@ -1372,7 +1365,6 @@
           { "prefecture": "広島県", "spa": "小瀬川温泉" },
           { "prefecture": "広島県", "spa": "潮原温泉" },
           { "prefecture": "広島県", "spa": "瀬戸温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "広島県", "spa": "養老温泉" },
           { "prefecture": "広島県", "spa": "比和温泉" },
           { "prefecture": "広島県", "spa": "庄原さくら温泉" },
@@ -1388,7 +1380,6 @@
           { "prefecture": "山口県", "spa": "俵山温泉" },
           { "prefecture": "山口県", "spa": "光室積温泉" },
           { "prefecture": "山口県", "spa": "大河内温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "山口県", "spa": "持世寺温泉" },
           { "prefecture": "山口県", "spa": "阿知須温泉" },
           { "prefecture": "山口県", "spa": "萩本陣温泉" },
@@ -1439,7 +1430,6 @@
           { "prefecture": "高知県", "spa": "黒潮本陣温泉" },
           { "prefecture": "高知県", "spa": "土佐山温泉" },
           { "prefecture": "高知県", "spa": "三翠園温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "高知県", "spa": "四万十源流の湯温泉" },
           { "prefecture": "高知県", "spa": "馬路温泉" },
           { "prefecture": "高知県", "spa": "松葉川温泉" },
@@ -1504,7 +1494,6 @@
           { "prefecture": "佐賀県", "spa": "その他" },
           { "prefecture": "長崎県", "spa": "小浜温泉" },
           { "prefecture": "長崎県", "spa": "湯ノ本温泉" },
-          { "prefecture": "and so on..." },
           { "prefecture": "長崎県", "spa": "大崎温泉" },
           { "prefecture": "長崎県", "spa": "原城温泉" },
           { "prefecture": "長崎県", "spa": "とぎつ天然温泉" },
@@ -1793,7 +1782,6 @@
         // 温泉ドロップダウンの選択肢を、現在選択されている都道府県から生成
         function updateOnsenDropdownOptions() {
             onsenInput.innerHTML = '<option value="" disabled selected>選択してください</option>';
-            onsenInput.innerHTML += '<option value="その他">その他</option>';
             
             if (selectedPrefs.length === 0) {
                 return;
