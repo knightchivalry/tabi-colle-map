@@ -118,10 +118,6 @@
         <!-- 入力フォーム -->
         <div id="form-dialog" class="absolute top-[45dvh] bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 flex flex-col hidden">
             <div class="w-full h-full p-5 relative overflow-y-auto no-scrollbar">
-                <!-- 閉じるボタン -->
-                <button id="close-form-btn" class="absolute top-4 right-4 p-2 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
-                    <i class="fa-solid fa-times text-lg"></i>
-                </button>
 
                 <h2 class="text-sm font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
                     <i class="fa-solid fa-pen-to-square mr-2 text-blue-500"></i>訪問記録の登録・更新
@@ -231,6 +227,18 @@
                         <div id="selected-onsens-container" class="flex flex-wrap gap-1.5 min-h-[24px]"></div>
                     </div>
 
+                    <!-- 移動距離・歩数 (任意) -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">移動距離 (km) (任意)</label>
+                            <input type="text" inputmode="decimal" id="distance-input" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-sm" placeholder="例: 5.5" oninput="this.value = this.value.replace(/[^0-9.]/g, '')">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">歩数 (歩) (任意)</label>
+                            <input type="text" inputmode="numeric" id="steps-input" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-sm" placeholder="例: 10000" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        </div>
+                    </div>
+
                     <!-- URL (新規・任意) -->
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 mb-1">URL (任意)</label>
@@ -245,11 +253,14 @@
 
                     <!-- ボタン -->
                     <div class="pt-2 flex gap-2">
+                        <button type="button" id="delete-btn" class="hidden bg-gray-100 hover:bg-red-50 text-red-500 font-bold py-3 px-4 rounded-xl border border-gray-200 transition-colors">
+                            <i class="fa-regular fa-trash-can text-lg"></i>
+                        </button>
                         <button type="submit" id="submit-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-blue-500/30 transition-colors flex justify-center items-center">
                             <i class="fa-solid fa-check mr-2"></i>登録する
                         </button>
-                        <button type="button" id="delete-btn" class="hidden bg-gray-100 hover:bg-red-50 text-red-500 font-bold py-3 px-4 rounded-xl border border-gray-200 transition-colors">
-                            <i class="fa-regular fa-trash-can"></i>
+                        <button type="button" id="close-form-btn" class="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-4 rounded-xl border border-gray-200 transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-times text-lg"></i>
                         </button>
                     </div>
                 </form>
@@ -322,14 +333,14 @@
         </div>
 
         <!-- トースト通知 -->
-        <div id="toast" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50 whitespace-nowrap">
+        <div id="toast" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50 whitespace-nowrap">
             保存しました
         </div>
     </div>
 
     <script>
         // アプリバージョン情報
-        const APP_VERSION = "ver1.0";
+        const APP_VERSION = "ver1.1";
 
         // 温泉データ（onsen.jsonの内容）
         const ONSEN_DATA = [
@@ -1222,24 +1233,24 @@
           { "prefecture": "奈良県", "spa": "十津川上湯温泉" },
           { "prefecture": "奈良県", "spa": "その他" },
           { "prefecture": "和歌山県", "spa": "南紀白浜温泉" },
-          { "prefecture": "and和歌山県", "spa": "南紀勝浦温泉" },
+          { "prefecture": "和歌山県", "spa": "南紀勝浦温泉" },
           { "prefecture": "和歌山県", "spa": "湯の峰温泉" },
           { "prefecture": "和歌山県", "spa": "川湯温泉" },
-          { "prefecture": "and和歌山県", "spa": "南紀湯川温泉" },
-          { "prefecture": "and和歌山県", "spa": "椿温泉" },
+          { "prefecture": "和歌山県", "spa": "南紀湯川温泉" },
+          { "prefecture": "和歌山県", "spa": "椿温泉" },
           { "prefecture": "和歌山県", "spa": "すさみ温泉" },
           { "prefecture": "和歌山県", "spa": "渡瀬温泉" },
           { "prefecture": "和歌山県", "spa": "加太温泉" },
-          { "prefecture": "and和歌山県", "spa": "美山温泉" },
+          { "prefecture": "和歌山県", "spa": "美山温泉" },
           { "prefecture": "和歌山県", "spa": "中津温泉" },
-          { "prefecture": "and和歌山県", "spa": "みなべ温泉" },
+          { "prefecture": "和歌山県", "spa": "みなべ温泉" },
           { "prefecture": "和歌山県", "spa": "花山温泉" },
           { "prefecture": "和歌山県", "spa": "紀伊見温泉" },
           { "prefecture": "和歌山県", "spa": "美里温泉" },
           { "prefecture": "和歌山県", "spa": "しみず温泉" },
           { "prefecture": "和歌山県", "spa": "滝原温泉" },
           { "prefecture": "和歌山県", "spa": "湯浅温泉" },
-          { "prefecture": "and和歌山県", "spa": "紀州みなべ千里浜温泉" },
+          { "prefecture": "和歌山県", "spa": "紀州みなべ千里浜温泉" },
           { "prefecture": "和歌山県", "spa": "夏山温泉" },
           { "prefecture": "和歌山県", "spa": "南紀月野瀬温泉" },
           { "prefecture": "和歌山県", "spa": "湯ノ谷温泉" },
@@ -1428,7 +1439,6 @@
           { "prefecture": "福岡県", "spa": "原鶴温泉" },
           { "prefecture": "福岡県", "spa": "筑後川温泉" },
           { "prefecture": "福岡県", "spa": "二日市温泉" },
-          { "prefecture": "福岡県", "spa": "その他" },
           { "prefecture": "福岡県", "spa": "博多温泉" },
           { "prefecture": "福岡県", "spa": "船小屋温泉" },
           { "prefecture": "福岡県", "spa": "脇田温泉" },
@@ -1601,7 +1611,7 @@
             'すべて': '#3b82f6'      // blue-500（青）
             ,'旅行(独り)': '#10b981' // emerald-500（緑） (変更: #ef4444 -> #10b981)
             ,'旅行(友人)': '#a855f7' // purple-500（紫） (変更: #0ea5e9 -> #a855f7)
-            ,'other': '#9ca3af'     // gray-400（灰色） (変更: #6b7280 -> #9ca3af)
+            ,'その他': '#9ca3af'     // gray-400（灰色） (変更: #6b7280 -> #9ca3af)
             ,'温泉': '#eab308'       // yellow-500（黄色） (変更: #3b82f6 -> #eab308)
         };
         const DEFAULT_STROKE = '#d1d5db'; // 未訪問の線
@@ -1635,6 +1645,8 @@
                             onsens: record.onsens || [],
                             memo: record.memo,
                             url: record.url || '', // URLの連携
+                            distance: record.distance || '',
+                            steps: record.steps || '',
                             date: record.date
                         });
                     });
@@ -1687,6 +1699,9 @@
         const daySelect = document.getElementById('day-select');
         const onsenInput = document.getElementById('onsen-input');
         const urlInput = document.getElementById('url-input'); // URL用のDOM要素
+
+        const distanceInput = document.getElementById('distance-input');
+        const stepsInput = document.getElementById('steps-input');
 
         // フィルタリング用のDOM要素
         const prefFilterSelect = document.getElementById('pref-filter-select');
@@ -1769,7 +1784,6 @@
         // 温泉ドロップダウンの選択肢を、現在選択されている都道府県から生成
         function updateOnsenDropdownOptions() {
             onsenInput.innerHTML = '<option value="" disabled selected>選択してください</option>';
-            onsenInput.innerHTML += '<option value="その他">その他</option>';
             
             if (selectedPrefs.length === 0) {
                 return;
@@ -1854,6 +1868,12 @@
                 }
                 formDialog.classList.remove('hidden');
                 updateMapColor(); // 開いた時の地図同期
+                // 表示された後にスクロール位置を最上部に固定する
+                if (formDialog && formDialog.firstElementChild) {
+                    setTimeout(() => {
+                        formDialog.firstElementChild.scrollTop = 0;
+                    }, 0);
+                }
             });
 
             // フォームダイアログを閉じるボタン
@@ -1953,6 +1973,8 @@
                     onsens: selectedOnsens,
                     memo: memoInput.value.trim(),
                     url, // URLの追加
+                    distance: distanceInput ? distanceInput.value.trim() : '',
+                    steps: stepsInput ? stepsInput.value.trim() : '',
                     date: new Date().toISOString()
                 };
 
@@ -2196,6 +2218,8 @@
             if (monthSelect) monthSelect.value = '';
             if (daySelect) daySelect.value = '';
             if (urlInput) urlInput.value = ''; // URLクリア
+            if (distanceInput) distanceInput.value = '';
+            if (stepsInput) stepsInput.value = '';
             
             document.querySelectorAll('input[name="visit-type"]').forEach(rb => {
                 rb.checked = false;
@@ -2209,8 +2233,11 @@
             editingIndex = null;
             editingRecordId = null;
 
+            // 表示された（または表示する）後に確実に最上部にスクロールするよう、マクロタスクで非同期に処理を実行
             if (formDialog && formDialog.firstElementChild) {
-                formDialog.firstElementChild.scrollTop = 0;
+                setTimeout(() => {
+                    formDialog.firstElementChild.scrollTop = 0;
+                }, 0);
             }
             updateMapColor();
         }
@@ -2254,6 +2281,8 @@
                 if (monthSelect) monthSelect.value = targetRecord.month || '';
                 if (daySelect) daySelect.value = targetRecord.day || '';
                 if (urlInput) urlInput.value = targetRecord.url || ''; // URLのロード
+                if (distanceInput) distanceInput.value = targetRecord.distance || '';
+                if (stepsInput) stepsInput.value = targetRecord.steps || '';
 
                 const types = targetRecord.types || [];
                 document.querySelectorAll('input[name="visit-type"]').forEach(rb => {
@@ -2270,8 +2299,11 @@
                 updateMapColor(); // 地図とのリアルタイム同期
             }
 
+            // 表示された（または表示する）後に確実に最上部にスクロールするよう、マクロタスクで非同期に処理を実行
             if (formDialog && formDialog.firstElementChild) {
-                formDialog.firstElementChild.scrollTop = 0;
+                setTimeout(() => {
+                    formDialog.firstElementChild.scrollTop = 0;
+                }, 0);
             }
         }
 
@@ -2309,6 +2341,8 @@
                             onsens: record.onsens || [],
                             memo: record.memo,
                             url: record.url || '', // URLの格納
+                            distance: record.distance || '',
+                            steps: record.steps || '',
                             date: record.date
                         }
                     });
@@ -2413,6 +2447,30 @@
                     });
                 }
 
+                // 5行目のテキスト要素の組み立て
+                let distanceStepStr = "";
+                if (data.distance && data.steps) {
+                    distanceStepStr = `👟距離 ${data.distance}km／ 歩数 ${data.steps}歩`;
+                } else if (data.distance) {
+                    distanceStepStr = `👟距離 ${data.distance}km`;
+                } else if (data.steps) {
+                    distanceStepStr = `👟${data.steps}歩`;
+                }
+
+                let memoStr = "";
+                if (data.memo) {
+                    memoStr = `✏${data.memo}`;
+                }
+
+                let footerText = "";
+                if (distanceStepStr && memoStr) {
+                    footerText = `${distanceStepStr}　${memoStr}`;
+                } else if (distanceStepStr) {
+                    footerText = distanceStepStr;
+                } else if (memoStr) {
+                    footerText = memoStr;
+                }
+
                 const item = document.createElement('div');
                 item.className = 'record-item bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between cursor-pointer active:bg-gray-50 transition-colors';
                 
@@ -2446,6 +2504,12 @@
                                 ${onsenBadgesHtml}
                             </div>
                             ` : ''}
+                            <!-- 5行目：移動距離、歩数、備考 (登録がある場合のみ表示。インデント幅を維持) -->
+                            ${footerText ? `
+                            <div class="text-xs text-gray-500 mt-1 pl-[1em] truncate">
+                                ${footerText}
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
                     <i class="fa-solid fa-chevron-right text-gray-300 text-xs ml-3"></i>
@@ -2455,6 +2519,12 @@
                     loadDataToForm(null, itemData.recordId);
                     formDialog.classList.remove('hidden');
                     updateMapColor(); // 地図とのリアルタイム同期を確実に行う
+                    // 表示された後にスクロール位置を最上部に固定する (修正内容2)
+                    if (formDialog && formDialog.firstElementChild) {
+                        setTimeout(() => {
+                            formDialog.firstElementChild.scrollTop = 0;
+                        }, 0);
+                    }
                 });
 
                 listContainer.appendChild(item);
@@ -2784,7 +2854,7 @@
             reader.readAsText(file);
         }
 
-        // カスタム確認ダイアログ用Promise関数
+        // カスタム確認ダイアログ用Promise関数 (修正内容1: 解決時のディレイを150msに延長して2回目のダイアログ衝突を防ぐ)
         function showCustomConfirm(title, message) {
             return new Promise((resolve) => {
                 const dialog = document.getElementById('custom-dialog');
@@ -2800,12 +2870,14 @@
 
                 const handleCancel = () => {
                     cleanup();
-                    resolve(false);
+                    // 前の確認ダイアログのクリックイベントと連鎖して誤作動するのを防ぐため、非同期マクロタスクで解決
+                    setTimeout(() => resolve(false), 150);
                 };
 
                 const handleOk = () => {
                     cleanup();
-                    resolve(true);
+                    // 前の確認ダイアログのクリックイベントと連鎖して誤作動するのを防ぐため、非同期マクロタスクで解決
+                    setTimeout(() => resolve(true), 150);
                 };
 
                 const cleanup = () => {
@@ -2836,7 +2908,8 @@
                 const handleOk = () => {
                     dialog.classList.add('hidden');
                     okBtn.removeEventListener('click', handleOk);
-                    resolve();
+                    // 前の確認ダイアログのクリックイベントと連鎖して誤作動するのを防ぐため、非同期マクロタスクで解決
+                    setTimeout(() => resolve(), 150);
                 };
 
                 okBtn.addEventListener('click', handleOk);
@@ -2863,6 +2936,85 @@
                 }
             }, 4500);
         };
+
+        // スマホの戻るボタン（◀）押下時の制御（History APIの導入）
+        (function() {
+            // 初期状態を履歴に保存
+            if (history.state === null) {
+                history.replaceState({ type: 'main' }, '');
+            }
+
+            // 開いているダイアログ/入力画面のIDリストを管理するスタック
+            let activeModals = [];
+
+            // プログラムからのhistory.back()によるpopstateイベントを無視するためのフラグ (修正内容2: 戻る連鎖バグを解消)
+            let ignoreNextPopstate = false;
+
+            // 対象となるモーダル要素のID
+            const targetModalIds = ['custom-dialog', 'settings-dialog', 'form-dialog'];
+
+            // 各モーダル要素を監視し、表示状態（hiddenクラスの有無）の変化を捉える
+            targetModalIds.forEach(id => {
+                const element = document.getElementById(id);
+                if (!element) return;
+
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.attributeName === 'class') {
+                            const isHidden = element.classList.contains('hidden');
+                            const index = activeModals.indexOf(id);
+
+                            if (!isHidden && index === -1) {
+                                // モーダルが開いた場合
+                                history.pushState({ modalId: id }, '');
+                                activeModals.push(id);
+                            } else if (isHidden && index !== -1) {
+                                // モーダルが閉じた場合
+                                activeModals.splice(index, 1);
+                                // 履歴上の状態と同期するため、プログラムから閉じられた場合は履歴を戻す
+                                if (history.state && history.state.modalId === id) {
+                                    ignoreNextPopstate = true;
+                                    history.back();
+                                }
+                            }
+                        }
+                    });
+                });
+
+                observer.observe(element, { attributes: true, attributeFilter: ['class'] });
+            });
+
+            // 戻るボタン押下（popstate）時の処理
+            window.addEventListener('popstate', (event) => {
+                if (ignoreNextPopstate) {
+                    ignoreNextPopstate = false;
+                    return;
+                }
+                if (activeModals.length > 0) {
+                    const topModalId = activeModals[activeModals.length - 1];
+                    const element = document.getElementById(topModalId);
+                    if (element) {
+                        // 各モーダルを閉じるためのトリガーを引く
+                        if (topModalId === 'custom-dialog') {
+                            // カスタムダイアログの場合、キャンセルまたはOKをクリックして閉じる
+                            const cancelBtn = document.getElementById('custom-dialog-cancel');
+                            if (cancelBtn && !cancelBtn.classList.contains('hidden')) {
+                                cancelBtn.click();
+                            } else {
+                                const okBtn = document.getElementById('custom-dialog-ok');
+                                if (okBtn) okBtn.click();
+                            }
+                        } else if (topModalId === 'settings-dialog') {
+                            const closeBtn = document.getElementById('close-settings-btn');
+                            if (closeBtn) closeBtn.click();
+                        } else if (topModalId === 'form-dialog') {
+                            const closeBtn = document.getElementById('close-form-btn');
+                            if (closeBtn) closeBtn.click();
+                        }
+                    }
+                }
+            });
+        })();
     </script>
 </body>
 </html>
