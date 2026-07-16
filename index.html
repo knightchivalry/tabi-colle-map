@@ -118,10 +118,6 @@
         <!-- 入力フォーム -->
         <div id="form-dialog" class="absolute top-[45dvh] bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 flex flex-col hidden">
             <div class="w-full h-full p-5 relative overflow-y-auto no-scrollbar">
-                <!-- 閉じるボタン -->
-                <button id="close-form-btn" class="absolute top-4 right-4 p-2 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
-                    <i class="fa-solid fa-times text-lg"></i>
-                </button>
 
                 <h2 class="text-sm font-bold text-gray-700 mb-4 border-b pb-2 flex items-center">
                     <i class="fa-solid fa-pen-to-square mr-2 text-blue-500"></i>訪問記録の登録・更新
@@ -255,13 +251,16 @@
                         <textarea id="memo-input" rows="2" class="w-full bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 text-sm" placeholder="訪れた場所や思い出など"></textarea>
                     </div>
 
-                    <!-- ボタン -->
+                    <!-- ボタン (修正内容1、変更:削除をごみ箱のみにして左、✕をキャンセルボタンにして一番右へ) -->
                     <div class="pt-2 flex gap-2">
+                        <button type="button" id="delete-btn" class="hidden bg-gray-100 hover:bg-red-50 text-red-500 font-bold py-3 px-4 rounded-xl border border-gray-200 transition-colors">
+                            <i class="fa-regular fa-trash-can text-lg"></i>
+                        </button>
                         <button type="submit" id="submit-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-blue-500/30 transition-colors flex justify-center items-center">
                             <i class="fa-solid fa-check mr-2"></i>登録する
                         </button>
-                        <button type="button" id="delete-btn" class="hidden bg-gray-100 hover:bg-red-50 text-red-500 font-bold py-3 px-4 rounded-xl border border-gray-200 transition-colors">
-                            <i class="fa-regular fa-trash-can"></i>
+                        <button type="button" id="close-form-btn" class="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-4 rounded-xl border border-gray-200 transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-times text-lg"></i>
                         </button>
                     </div>
                 </form>
@@ -334,7 +333,7 @@
         </div>
 
         <!-- トースト通知 -->
-        <div id="toast" class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50 whitespace-nowrap">
+        <div id="toast" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50 whitespace-nowrap">
             保存しました
         </div>
     </div>
@@ -1237,6 +1236,7 @@
           { "prefecture": "和歌山県", "spa": "南紀勝浦温泉" },
           { "prefecture": "和歌山県", "spa": "湯の峰温泉" },
           { "prefecture": "和歌山県", "spa": "川湯温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "和歌山県", "spa": "南紀湯川温泉" },
           { "prefecture": "和歌山県", "spa": "椿温泉" },
           { "prefecture": "和歌山県", "spa": "すさみ温泉" },
@@ -1248,13 +1248,16 @@
           { "prefecture": "和歌山県", "spa": "花山温泉" },
           { "prefecture": "和歌山県", "spa": "紀伊見温泉" },
           { "prefecture": "和歌山県", "spa": "美里温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "和歌山県", "spa": "しみず温泉" },
           { "prefecture": "和歌山県", "spa": "紀州みなべ千里浜温泉" },
           { "prefecture": "和歌山県", "spa": "夏山温泉" },
           { "prefecture": "和歌山県", "spa": "南紀月野瀬温泉" },
           { "prefecture": "和歌山県", "spa": "湯ノ谷温泉" },
           { "prefecture": "和歌山県", "spa": "日置川温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "和歌山県", "spa": "雲取温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "和歌山県", "spa": "熊野川温泉" },
           { "prefecture": "和歌山県", "spa": "その他" },
           { "prefecture": "大阪府", "spa": "犬鳴山温泉" },
@@ -1287,6 +1290,7 @@
           { "prefecture": "兵庫県", "spa": "神戸みなと温泉" },
           { "prefecture": "兵庫県", "spa": "東条温泉" },
           { "prefecture": "兵庫県", "spa": "加古川温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "兵庫県", "spa": "やしろ夢園温泉" },
           { "prefecture": "兵庫県", "spa": "波賀温泉" },
           { "prefecture": "兵庫県", "spa": "生谷温泉" },
@@ -1342,8 +1346,9 @@
           { "prefecture": "岡山県", "spa": "岡山空港温泉" },
           { "prefecture": "岡山県", "spa": "小森温泉" },
           { "prefecture": "岡山県", "spa": "八幡温泉郷" },
-          { "prefecture": "岡山県", "spa": "粟井温泉" },
+          { "prefecture": "岡山県", "spa": "基本温泉" },
           { "prefecture": "岡山県", "spa": "怒塚山温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "岡山県", "spa": "和気鵜飼谷温泉" },
           { "prefecture": "岡山県", "spa": "たまの温泉" },
           { "prefecture": "岡山県", "spa": "鷲羽山吹上温泉" },
@@ -1358,6 +1363,7 @@
           { "prefecture": "岡山県", "spa": "その他" },
           { "prefecture": "広島県", "spa": "女鹿平温泉" },
           { "prefecture": "広島県", "spa": "湯来温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "広島県", "spa": "宮浜温泉" },
           { "prefecture": "広島県", "spa": "湯の山温泉" },
           { "prefecture": "広島県", "spa": "君田温泉" },
@@ -1366,6 +1372,7 @@
           { "prefecture": "広島県", "spa": "小瀬川温泉" },
           { "prefecture": "広島県", "spa": "潮原温泉" },
           { "prefecture": "広島県", "spa": "瀬戸温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "広島県", "spa": "養老温泉" },
           { "prefecture": "広島県", "spa": "比和温泉" },
           { "prefecture": "広島県", "spa": "庄原さくら温泉" },
@@ -1381,6 +1388,7 @@
           { "prefecture": "山口県", "spa": "俵山温泉" },
           { "prefecture": "山口県", "spa": "光室積温泉" },
           { "prefecture": "山口県", "spa": "大河内温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "山口県", "spa": "持世寺温泉" },
           { "prefecture": "山口県", "spa": "阿知須温泉" },
           { "prefecture": "山口県", "spa": "萩本陣温泉" },
@@ -1431,6 +1439,7 @@
           { "prefecture": "高知県", "spa": "黒潮本陣温泉" },
           { "prefecture": "高知県", "spa": "土佐山温泉" },
           { "prefecture": "高知県", "spa": "三翠園温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "高知県", "spa": "四万十源流の湯温泉" },
           { "prefecture": "高知県", "spa": "馬路温泉" },
           { "prefecture": "高知県", "spa": "松葉川温泉" },
@@ -1438,7 +1447,6 @@
           { "prefecture": "福岡県", "spa": "原鶴温泉" },
           { "prefecture": "福岡県", "spa": "筑後川温泉" },
           { "prefecture": "福岡県", "spa": "二日市温泉" },
-          { "prefecture": "福岡県", "spa": "その他" },
           { "prefecture": "福岡県", "spa": "博多温泉" },
           { "prefecture": "福岡県", "spa": "船小屋温泉" },
           { "prefecture": "福岡県", "spa": "脇田温泉" },
@@ -1472,7 +1480,7 @@
           { "prefecture": "大分県", "spa": "日出温泉" },
           { "prefecture": "大分県", "spa": "九酔渓温泉" },
           { "prefecture": "大分県", "spa": "久住赤川温泉" },
-          { "prefecture": "大分県", "spa": "杵築温泉" },
+          { "prefecture": "大分県", "spa": "兵頭温泉" },
           { "prefecture": "大分県", "spa": "柴石温泉" },
           { "prefecture": "大分県", "spa": "長者原温泉" },
           { "prefecture": "大分県", "spa": "山香温泉" },
@@ -1496,6 +1504,7 @@
           { "prefecture": "佐賀県", "spa": "その他" },
           { "prefecture": "長崎県", "spa": "小浜温泉" },
           { "prefecture": "長崎県", "spa": "湯ノ本温泉" },
+          { "prefecture": "and so on..." },
           { "prefecture": "長崎県", "spa": "大崎温泉" },
           { "prefecture": "長崎県", "spa": "原城温泉" },
           { "prefecture": "長崎県", "spa": "とぎつ天然温泉" },
@@ -1869,6 +1878,12 @@
                 }
                 formDialog.classList.remove('hidden');
                 updateMapColor(); // 開いた時の地図同期
+                // 表示された後にスクロール位置を最上部に固定する (修正内容2)
+                if (formDialog && formDialog.firstElementChild) {
+                    setTimeout(() => {
+                        formDialog.firstElementChild.scrollTop = 0;
+                    }, 0);
+                }
             });
 
             // フォームダイアログを閉じるボタン
@@ -2228,8 +2243,11 @@
             editingIndex = null;
             editingRecordId = null;
 
+            // 表示された（または表示する）後に確実に最上部にスクロールするよう、マクロタスクで非同期に処理を実行
             if (formDialog && formDialog.firstElementChild) {
-                formDialog.firstElementChild.scrollTop = 0;
+                setTimeout(() => {
+                    formDialog.firstElementChild.scrollTop = 0;
+                }, 0);
             }
             updateMapColor();
         }
@@ -2291,8 +2309,11 @@
                 updateMapColor(); // 地図とのリアルタイム同期
             }
 
+            // 表示された（または表示する）後に確実に最上部にスクロールするよう、マクロタスクで非同期に処理を実行
             if (formDialog && formDialog.firstElementChild) {
-                formDialog.firstElementChild.scrollTop = 0;
+                setTimeout(() => {
+                    formDialog.firstElementChild.scrollTop = 0;
+                }, 0);
             }
         }
 
@@ -2508,6 +2529,12 @@
                     loadDataToForm(null, itemData.recordId);
                     formDialog.classList.remove('hidden');
                     updateMapColor(); // 地図とのリアルタイム同期を確実に行う
+                    // 表示された後にスクロール位置を最上部に固定する (修正内容2)
+                    if (formDialog && formDialog.firstElementChild) {
+                        setTimeout(() => {
+                            formDialog.firstElementChild.scrollTop = 0;
+                        }, 0);
+                    }
                 });
 
                 listContainer.appendChild(item);
@@ -2837,7 +2864,7 @@
             reader.readAsText(file);
         }
 
-        // カスタム確認ダイアログ用Promise関数
+        // カスタム確認ダイアログ用Promise関数 (修正内容1: 解決時のディレイを150msに延長して2回目のダイアログ衝突を防ぐ)
         function showCustomConfirm(title, message) {
             return new Promise((resolve) => {
                 const dialog = document.getElementById('custom-dialog');
@@ -2853,12 +2880,14 @@
 
                 const handleCancel = () => {
                     cleanup();
-                    resolve(false);
+                    // 前の確認ダイアログのクリックイベントと連鎖して誤作動するのを防ぐため、非同期マクロタスクで解決
+                    setTimeout(() => resolve(false), 150);
                 };
 
                 const handleOk = () => {
                     cleanup();
-                    resolve(true);
+                    // 前の確認ダイアログのクリックイベントと連鎖して誤作動するのを防ぐため、非同期マクロタスクで解決
+                    setTimeout(() => resolve(true), 150);
                 };
 
                 const cleanup = () => {
@@ -2889,7 +2918,8 @@
                 const handleOk = () => {
                     dialog.classList.add('hidden');
                     okBtn.removeEventListener('click', handleOk);
-                    resolve();
+                    // 前の確認ダイアログのクリックイベントと連鎖して誤作動するのを防ぐため、非同期マクロタスクで解決
+                    setTimeout(() => resolve(), 150);
                 };
 
                 okBtn.addEventListener('click', handleOk);
@@ -2916,6 +2946,85 @@
                 }
             }, 4500);
         };
+
+        // スマホの戻るボタン（◀）押下時の制御（History APIの導入）
+        (function() {
+            // 初期状態を履歴に保存
+            if (history.state === null) {
+                history.replaceState({ type: 'main' }, '');
+            }
+
+            // 開いているダイアログ/入力画面のIDリストを管理するスタック
+            let activeModals = [];
+
+            // プログラムからのhistory.back()によるpopstateイベントを無視するためのフラグ (修正内容2: 戻る連鎖バグを解消)
+            let ignoreNextPopstate = false;
+
+            // 対象となるモーダル要素のID
+            const targetModalIds = ['custom-dialog', 'settings-dialog', 'form-dialog'];
+
+            // 各モーダル要素を監視し、表示状態（hiddenクラスの有無）の変化を捉える
+            targetModalIds.forEach(id => {
+                const element = document.getElementById(id);
+                if (!element) return;
+
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.attributeName === 'class') {
+                            const isHidden = element.classList.contains('hidden');
+                            const index = activeModals.indexOf(id);
+
+                            if (!isHidden && index === -1) {
+                                // モーダルが開いた場合
+                                history.pushState({ modalId: id }, '');
+                                activeModals.push(id);
+                            } else if (isHidden && index !== -1) {
+                                // モーダルが閉じた場合
+                                activeModals.splice(index, 1);
+                                // 履歴上の状態と同期するため、プログラムから閉じられた場合は履歴を戻す
+                                if (history.state && history.state.modalId === id) {
+                                    ignoreNextPopstate = true;
+                                    history.back();
+                                }
+                            }
+                        }
+                    });
+                });
+
+                observer.observe(element, { attributes: true, attributeFilter: ['class'] });
+            });
+
+            // 戻るボタン押下（popstate）時の処理
+            window.addEventListener('popstate', (event) => {
+                if (ignoreNextPopstate) {
+                    ignoreNextPopstate = false;
+                    return;
+                }
+                if (activeModals.length > 0) {
+                    const topModalId = activeModals[activeModals.length - 1];
+                    const element = document.getElementById(topModalId);
+                    if (element) {
+                        // 各モーダルを閉じるためのトリガーを引く
+                        if (topModalId === 'custom-dialog') {
+                            // カスタムダイアログの場合、キャンセルまたはOKをクリックして閉じる
+                            const cancelBtn = document.getElementById('custom-dialog-cancel');
+                            if (cancelBtn && !cancelBtn.classList.contains('hidden')) {
+                                cancelBtn.click();
+                            } else {
+                                const okBtn = document.getElementById('custom-dialog-ok');
+                                if (okBtn) okBtn.click();
+                            }
+                        } else if (topModalId === 'settings-dialog') {
+                            const closeBtn = document.getElementById('close-settings-btn');
+                            if (closeBtn) closeBtn.click();
+                        } else if (topModalId === 'form-dialog') {
+                            const closeBtn = document.getElementById('close-form-btn');
+                            if (closeBtn) closeBtn.click();
+                        }
+                    }
+                }
+            });
+        })();
     </script>
 </body>
 </html>
